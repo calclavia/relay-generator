@@ -1,5 +1,5 @@
 # Given a world, produce all possible solutions.
-from util import PriorityQueue
+from .util import PriorityQueue
 
 def nullHeuristic(state, problem=None):
     """

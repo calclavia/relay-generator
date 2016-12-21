@@ -1,6 +1,6 @@
-from world import *
-from util import Direction
-from search import *
+from .world import *
+from .util import Direction
+from .search import *
 import unittest
 
 class Problem:
@@ -14,11 +14,8 @@ class Problem:
         """
         Gets the starting state of the problem
         """
-        if len(self.world.directions) > 0:
-            for index, value in np.ndenumerate(self.world.blocks):
-                if value == BlockType.start.value:
-                    return (index, 0)
-
+        if len(self.directions) > 0:
+            return self.world.get_type(BlockType.start)
         return None
 
     def get_next(self, state):

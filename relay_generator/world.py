@@ -16,6 +16,27 @@ class World:
                pos[0] < self.blocks.shape[0] and\
                pos[1] < self.blocks.shape[1]
 
+    def get_type(self, block_type):
+        """
+        Gets the starting state of the problem
+        """
+        for index, value in np.ndenumerate(self.blocks):
+            if value == block_type.value:
+                return (index, 0)
+
+        return None
+
+    def count_type(self, block_type):
+        """
+        Gets the starting state of the problem
+        """
+        i = 0
+        for index, value in np.ndenumerate(self.blocks):
+            if value == block_type.value:
+                i += 1
+
+        return i
+
 class BlockType(Enum):
     empty = 0
     solid = 1
