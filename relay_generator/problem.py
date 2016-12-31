@@ -14,7 +14,7 @@ class Problem:
         """
         Gets the starting state of the problem
         """
-        if len(self.directions) > 0:
+        if len(self.world.directions) > 0:
             return self.world.get_type(BlockType.start)
         return None
 

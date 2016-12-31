@@ -38,7 +38,8 @@ class World:
         return i
 
 class BlockType(Enum):
-    empty = 0
-    solid = 1
-    start = 2
-    end = 3
+    null = 0
+    empty = 1
+    solid = 2
+    start = 3
+    end = 4

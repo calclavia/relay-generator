@@ -1,11 +1,19 @@
 import heapq
 from enum import Enum
 
+
 class Direction(Enum):
     right = (0, (1, 0))
     left = (1, (-1, 0))
     up = (2, (0, 1))
     down = (3, (0, -1))
+
+DirectionMap = {
+    0: Direction.right,
+    1: Direction.left,
+    2: Direction.up,
+    3: Direction.down,
+}
 
 class PriorityQueue:
     """
@@ -14,7 +22,8 @@ class PriorityQueue:
       in quick retrieval of the lowest-priority item in the queue. This
       data structure allows O(1) access to the lowest-priority item.
     """
-    def  __init__(self):
+
+    def __init__(self):
         self.heap = []
         self.count = 0
 
