@@ -41,9 +41,9 @@ def one_hot(index, size):
 def summary_writer(summary_path, prefix=''):
     writers = {}
     def write(agent):
-        # TODO: Hacks
         if agent.name not in writers:
-            writers[agent.name] =tf.summary.FileWriter(summary_path + '/' + agent.name)
+            writers[agent.name] = tf.summary.FileWriter(summary_path + '/' + agent.name)
+
         writer = writers[agent.name]
         summary = tf.Summary()
 

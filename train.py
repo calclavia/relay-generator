@@ -6,8 +6,8 @@ from optparse import OptionParser
 
 import relay_generator
 
-units = 256
-layers = 8
+units = 100
+layers = 1
 
 parser = OptionParser()
 parser.add_option("-e", "--env",  help="Gym Environment")
@@ -18,8 +18,6 @@ env = gym.make(options.env)
 state_shape = space_to_shape(env.observation_space)
 # Agent action space size
 num_actions = action_to_shape(env.action_space)
-
-tf.reset_default_graph()
 
 # Directories
 output_path = './out'
@@ -41,6 +39,7 @@ def state_saver(agent):
         with open(state_path + '/state-' + str(agent.episode_count), 'w') as f:
             f.write(np.array2string(state, separator=', '))
 """
-coord = A3CCoordinator(num_actions, model_builder)
-cbs = [summary_writer(summary_path)]#, saver(model_path, coord.saver)]
-coord.train(options.env, callbacks=cbs)
+with tf.device("/cpu:0"):
+    coord = A3CCoordinator(num_actions, model_builder)
+    cbs = [summary_writer(summary_path)]#, saver(model_path, coord.saver)]
+    coord.train(options.env, callbacks=cbs)

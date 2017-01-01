@@ -12,38 +12,42 @@ from models import *
 from util import *
 
 class AC_Network():
-    def __init__(self, model, a_size, scope, optimizer):
+    def __init__(self, model, num_actions, scope):
+        self.scope = scope
+        self.num_actions = num_actions
+
         with tf.variable_scope(scope):
             self.inputs, x = model
 
             #Output layers for policy and value estimations
-            self.policy = Dense(a_size, activation='softmax', name='policy_output')(x)
+            self.policy = Dense(num_actions, activation='softmax', name='policy_output')(x)
             self.value = Dense(1, activation='linear', name='value_output')(x)
 
-            # Only the worker network need ops for loss functions and gradient updating.
-            if scope != 'global':
-                self.actions = tf.placeholder(shape=[None], dtype=tf.int32)
-                self.actions_onehot = tf.one_hot(self.actions, a_size, dtype=tf.float32)
-                self.target_v = tf.placeholder(shape=[None], dtype=tf.float32)
-                self.advantages = tf.placeholder(shape=[None], dtype=tf.float32)
+    def compile(self, optimizer):
+        # Only the worker network need ops for loss functions and gradient updating.
+        with tf.variable_scope(self.scope):
+            self.actions = tf.placeholder(shape=[None], dtype=tf.int32)
+            self.actions_onehot = tf.one_hot(self.actions, self.num_actions, dtype=tf.float32)
+            self.target_v = tf.placeholder(shape=[None], dtype=tf.float32)
+            self.advantages = tf.placeholder(shape=[None], dtype=tf.float32)
 
-                self.responsible_outputs = tf.reduce_sum(self.policy * self.actions_onehot, [1])
+            self.responsible_outputs = tf.reduce_sum(self.policy * self.actions_onehot, [1])
 
-                #Loss functions
-                self.value_loss = 0.5 * tf.reduce_sum(tf.square(self.target_v - tf.reshape(self.value,[-1])))
-                self.entropy = - tf.reduce_sum(self.policy * tf.log(self.policy))
-                self.policy_loss = -tf.reduce_sum(tf.log(self.responsible_outputs)*self.advantages)
-                self.loss = 0.5 * self.value_loss + self.policy_loss - self.entropy * 0.01
+            #Loss functions
+            self.value_loss = 0.5 * tf.reduce_sum(tf.square(self.target_v - tf.reshape(self.value,[-1])))
+            self.entropy = - tf.reduce_sum(self.policy * tf.log(self.policy))
+            self.policy_loss = -tf.reduce_sum(tf.log(self.responsible_outputs)*self.advantages)
+            self.loss = 0.5 * self.value_loss + self.policy_loss - self.entropy * 0.01
 
-                # Get gradients from local network using local losses
-                local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
-                self.gradients = tf.gradients(self.loss, local_vars)
-                self.var_norms = tf.global_norm(local_vars)
-                grads, self.grad_norms = tf.clip_by_global_norm(self.gradients, 40.0)
+            # Get gradients from local network using local losses
+            local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
+            self.gradients = tf.gradients(self.loss, local_vars)
+            self.var_norms = tf.global_norm(local_vars)
+            grads, self.grad_norms = tf.clip_by_global_norm(self.gradients, 40.0)
 
-                # Apply local gradients to global network
-                global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
-                self.apply_grads = optimizer.apply_gradients(zip(grads, global_vars))
+            # Apply local gradients to global network
+            global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
+            self.apply_grads = optimizer.apply_gradients(zip(grads, global_vars))
 
 class A3CAgent:
     def __init__(self, env, name, model, discount, callbacks):
@@ -69,6 +73,7 @@ class A3CAgent:
         self.update_local_ops = update_target_graph('global', self.name)
 
         self.env = env
+        self.max_buffer = 30
 
     def train(self,
             sess,
@@ -180,10 +185,9 @@ class A3CAgent:
             observation = next_observation
             episode_step_count += 1
 
-            """
             # If the episode hasn't ended, but the experience buffer is
             # full, then we make an update step using that experience.
-            if learn and len(states) == 30 and not done and episode_step_count != max_episode_length - 1:
+            if learn and len(states) == self.max_buffer and not done:
                 # Since we don't know what the true final return is,
                 # we "bootstrap" from our current value estimation.
                 v1 = sess.run(self.model.value, {
@@ -208,7 +212,6 @@ class A3CAgent:
                 rewards = []
 
                 sess.run(self.update_local_ops)
-            """
 
         if learn:
             # Train the network using the experience buffer at the end of the episode.
@@ -233,7 +236,7 @@ class A3CCoordinator:
         self.num_actions = num_actions
         self.model_builder = model_builder
         # Generate global network
-        self.model = AC_Network(model_builder(), num_actions, 'global', None)
+        self.model = AC_Network(model_builder(), num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
 
     def load(self, sess):
@@ -247,13 +250,14 @@ class A3CCoordinator:
               num_workers=multiprocessing.cpu_count(),
               optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)):
 
-        with tf.device("/cpu:0"), tf.Session() as sess:
+        with tf.Session() as sess:
             workers = []
             # Create worker classes
             for i in range(num_workers):
                 env = gym.make(env_name)
                 name = 'worker_' + str(i)
-                model = AC_Network(self.model_builder(), self.num_actions, name, optimizer)
+                model = AC_Network(self.model_builder(), self.num_actions, name)
+                model.compile(optimizer)
                 workers.append(A3CAgent(env, name, model, discount, callbacks))
 
             # Initialize variables
@@ -264,8 +268,7 @@ class A3CCoordinator:
             # Start the "work" process for each worker in a separate threat.
             worker_threads = []
             for worker in workers:
-                worker_work = lambda: worker.run(sess, coord)
-                t = threading.Thread(target=(worker_work))
+                t = threading.Thread(target=lambda: worker.run(sess, coord))
                 t.start()
                 worker_threads.append(t)
             coord.join(worker_threads)
