@@ -34,31 +34,32 @@ class RelayEnv(gym.Env):
 
         observation = self.world.blocks.flatten()
         done = self.actions >= self.size
-        reward = 0
+        reward = 1
 
         self.block_counter[BlockType(action)] += 1
 
         if action == BlockType.start.value:
             if self.block_counter[BlockType.start] == 1:
-                reward += 1
+                reward += 10
             else:
-                reward -= 1
+                done = True
 
         if action == BlockType.end.value:
             if self.block_counter[BlockType.end] == 1:
-                reward += 1
+                reward += 10
             else:
-                reward -= 1
+                done = True
 
-        # Reward if there exists a solution to this level
+
         if done:
+            # Reward based on level density
             reward -= abs(self.block_counter[BlockType.solid] - 0.6 * self.size) / self.size
 
-            # Generating a map with a solution is worth a lot
+            # Reward if there exists a solution to this level
             if self.block_counter[BlockType.start] == 1 and\
                self.block_counter[BlockType.end] == 1 and\
                search(Problem(self.world)) != None:
-                reward += 50
+                reward += 100
 
         return observation, reward, done, {}
 

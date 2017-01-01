@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 import os
 import gym
+import threading
+import multiprocessing
 from gym import spaces
 
 from keras import backend as K
@@ -121,20 +123,20 @@ class A3CAgent:
             return one_hot(observation, self.env.observation_space.n)
         return observation
 
-    def run(self, max_episode_length, sess, coord, learn=True):
+    def run(self, sess, coord, learn=True):
         self.episode_count = 0
 
         print("Starting worker " + str(self.name))
         with sess.as_default(), sess.graph.as_default():
             while not coord.should_stop():
-                self.run_episode(max_episode_length, sess, learn)
+                self.run_episode(sess, learn)
                 self.episode_count += 1
 
                 # Execute callbacks
                 for cb in self.callbacks:
                     cb(self)
 
-    def run_episode(self, max_episode_length, sess, learn=True):
+    def run_episode(self, sess, learn=True):
         # Sync local network with global network
         sess.run(self.update_local_ops)
 
@@ -178,6 +180,7 @@ class A3CAgent:
             observation = next_observation
             episode_step_count += 1
 
+            """
             # If the episode hasn't ended, but the experience buffer is
             # full, then we make an update step using that experience.
             if learn and len(states) == 30 and not done and episode_step_count != max_episode_length - 1:
@@ -205,6 +208,7 @@ class A3CAgent:
                 rewards = []
 
                 sess.run(self.update_local_ops)
+            """
 
         if learn:
             # Train the network using the experience buffer at the end of the episode.
@@ -223,3 +227,45 @@ class A3CAgent:
         self.metrics['lengths'].append(episode_step_count)
         self.metrics['mean_values'].append(total_value / episode_step_count)
         return observation
+
+class A3CCoordinator:
+    def __init__(self, num_actions, model_builder):
+        self.num_actions = num_actions
+        self.model_builder = model_builder
+        # Generate global network
+        self.model = AC_Network(model_builder(), num_actions, 'global', None)
+        self.saver = tf.train.Saver(max_to_keep=5)
+
+    def load(self, sess):
+        ckpt = tf.train.get_checkpoint_state(model_path)
+        self.saver.restore(sess, ckpt.model_checkpoint_path)
+
+    def train(self,
+              env_name,
+              discount=.99,
+              callbacks=[],
+              num_workers=multiprocessing.cpu_count(),
+              optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)):
+
+        with tf.device("/cpu:0"), tf.Session() as sess:
+            workers = []
+            # Create worker classes
+            for i in range(num_workers):
+                env = gym.make(env_name)
+                name = 'worker_' + str(i)
+                model = AC_Network(self.model_builder(), self.num_actions, name, optimizer)
+                workers.append(A3CAgent(env, name, model, discount, callbacks))
+
+            # Initialize variables
+            sess.run(tf.global_variables_initializer())
+
+            coord = tf.train.Coordinator()
+            # This is where the asynchronous magic happens.
+            # Start the "work" process for each worker in a separate threat.
+            worker_threads = []
+            for worker in workers:
+                worker_work = lambda: worker.run(sess, coord)
+                t = threading.Thread(target=(worker_work))
+                t.start()
+                worker_threads.append(t)
+            coord.join(worker_threads)

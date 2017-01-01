@@ -38,8 +38,13 @@ def action_to_shape(space):
 def one_hot(index, size):
     return [1 if index == i else 0 for i in range(size)]
 
-def summary_writer(prefix, writer):
+def summary_writer(summary_path, prefix=''):
+    writers = {}
     def write(agent):
+        # TODO: Hacks
+        if agent.name not in writers:
+            writers[agent.name] =tf.summary.FileWriter(summary_path + '/' + agent.name)
+        writer = writers[agent.name]
         summary = tf.Summary()
 
         for name, values in agent.metrics.items():
@@ -49,6 +54,12 @@ def summary_writer(prefix, writer):
         writer.flush()
 
     return write
+
+def saver(model_path, saver):
+    def save(agent):
+        if agent.name == 'worker_1' and agent.episode_count % 100 == 0:
+            saver.save(sess, model_path + '/model-' + str(agent.episode_count) + '.cptk')
+    return save
 
 def update_target_graph(from_scope, to_scope):
     """
