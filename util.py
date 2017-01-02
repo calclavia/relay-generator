@@ -55,7 +55,7 @@ def make_summary(data, prefix=''):
 
 
 def save_worker(sess, coord, agent):
-    while True:
+    while not coord.should_stop():
         time.sleep(30)
         print('Saving model...')
         agent.save(sess)

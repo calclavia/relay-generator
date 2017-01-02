@@ -17,7 +17,6 @@ run = True if options.run is not None else False
 units = int(options.size) if options.size is not None else 128
 layers = int(options.layers) if options.layers is not None else 5
 
-
 env = gym.make(options.env)
 # Observation space size
 state_shape = space_to_shape(env.observation_space)
@@ -34,15 +33,8 @@ for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-model_builder = lambda: dense(state_shape, units, layers)
+model_builder = lambda: dense_1(state_shape) # dense(state_shape, units, layers, dropout=0.25)
 
-"""
-def state_saver(agent):
-    if agent.episode_count % 100 == 0:
-        state = agent.run_episode(0, sess, False).reshape(9, 9)
-        with open(state_path + '/state-' + str(agent.episode_count), 'w') as f:
-            f.write(np.array2string(state, separator=', '))
-"""
 with tf.device("/cpu:0"):
     # TODO: Output
     coord = A3CCoordinator(num_actions, model_builder)

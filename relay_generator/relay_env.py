@@ -19,7 +19,8 @@ class RelayEnv(gym.Env):
 
         # Observe the world
         self.observation_space = spaces.Tuple(
-            tuple(spaces.Discrete(num_block_type) for _ in range(self.size))
+            tuple(spaces.Discrete(num_block_type) for _ in range(self.size)) +
+            (spaces.Box(0, 1000, shape=(1)),)
         )
 
         # Actions allow the world to be populated.
@@ -27,8 +28,8 @@ class RelayEnv(gym.Env):
 
     def _step(self, action):
         # Apply action
-        d = DirectionMap[action].value[1]
-        self.pos = (self.pos[0] + d[0], self.pos[1] + d[1])
+        direction = DirectionMap[action].value[1]
+        self.pos = (self.pos[0] + direction[0], self.pos[1] + direction[1])
 
         done = False
         reward = 0
@@ -36,33 +37,47 @@ class RelayEnv(gym.Env):
         if not self.world.in_bounds(self.pos):
             # We went out of the map
             done = True
+            # reward -= 1
         elif self.world.blocks[self.pos] == BlockType.empty.value:
             # We went back to a previous position
             done = True
+            # reward -= 1
         elif self.world.blocks[self.pos] == BlockType.start.value:
             # We've came back!
             done = True
-            reward += 10
+            reward += 1
+            # Additional rewards
+            #reward += 1 / (self.difficulty - self.turns + 1)
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
-            reward += 1
+            if direction != self.prev_dir:
+                self.turns += 1
+                self.prev_dir = direction
+            # reward += 1
 
-        observation = self.world.blocks.flatten()
-        return observation, reward, done, {}
+        self.actions += 1
+        return self.build_observation(), reward, done, {}
 
     def _reset(self):
-        self.block_counter = {
-            BlockType.start: 0,
-            BlockType.empty: 0,
-            BlockType.solid: 0,
-        }
+        # Number of actions performed
+        self.actions = 0
+        # Number of turns made
+        self.turns = 0
+        self.prev_dir = None
 
         self.world = World(self.dim)
         # Generate random starting position
         self.pos = (np.random.randint(self.dim[0]), np.random.randint(self.dim[1]))
         self.world.blocks[self.pos] = BlockType.start.value
-        return self.world.blocks.flatten()
+        # Generate random difficulty
+        self.difficulty = np.random.uniform(4, 10)
+
+        return self.build_observation()
+
+    def build_observation(self):
+        blocks = np.array(self.world.blocks.flatten(), dtype='float')
+        return np.concatenate((blocks, [self.difficulty]))
 
     def _render(self, mode='human', close=False):
         pass

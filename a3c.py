@@ -9,6 +9,7 @@ from gym import spaces
 
 from keras import backend as K
 from keras.layers import Dense
+from keras.models import Model
 from models import *
 from util import *
 
@@ -19,10 +20,10 @@ class AC_Network():
 
         with tf.variable_scope(self.scope):
             self.inputs, x = model_builder()
-
             #Output layers for policy and value estimations
             self.policy = Dense(num_actions, activation='softmax', name='policy_output')(x)
             self.value = Dense(1, activation='linear', name='value_output')(x)
+            self.model = Model(self.inputs, [self.policy, self.value])
 
     def compile(self, optimizer):
         # Only the worker network need ops for loss functions and gradient updating.
@@ -88,7 +89,10 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
 
             while not (terminal or ((t - t_start) == max_buffer)):
                 # Perform action according to policy pi(a_t | s_t)
-                probs, value = sess.run([model.policy, model.value], { model.inputs: [state] })
+                probs, value = sess.run([model.policy, model.value], {
+                    model.inputs: [state],
+                    K.learning_phase(): 0
+                })
 
                 # Remove batch dimension
                 probs = probs[0]
@@ -117,7 +121,10 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 reward = 0
             else:
                 # Bootstrap from last state
-                reward = sess.run(model.value, {model.inputs: [state]})[0][0]
+                reward = sess.run(model.value, {
+                    model.inputs: [state],
+                    K.learning_phase(): 0
+                })[0][0]
 
             # Here we take the rewards and values from the exp, and use them to
             # generate the advantage and discounted returns.
@@ -139,7 +146,8 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                     model.target_v: discounted_rewards,
                     model.inputs: states,
                     model.actions: actions,
-                    model.advantages: advantages
+                    model.advantages: advantages,
+                    K.learning_phase(): 1
                 }
             )
 
@@ -178,6 +186,8 @@ class A3CCoordinator:
         self.model = AC_Network(model_builder, num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
         self.model_path = model_path
+
+        print(self.model.model.summary())
 
     def load(self, sess):
         ckpt = tf.train.get_checkpoint_state(self.model_path)
@@ -235,7 +245,10 @@ class A3CCoordinator:
 
             while not terminal:
                 # Perform action according to policy pi(a_t | s_t)
-                probs, value = sess.run([self.model.policy, self.model.value], { self.model.inputs: [state] })
+                probs, value = sess.run([self.model.policy, self.model.value], {
+                    self.model.inputs: [state],
+                    K.learning_phase(): 0
+                })
 
                 # Remove batch dimension
                 probs = probs[0]
