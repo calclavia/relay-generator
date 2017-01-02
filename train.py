@@ -42,5 +42,4 @@ def state_saver(agent):
 with tf.device("/cpu:0"):
     # TODO: Output
     coord = A3CCoordinator(num_actions, model_builder)
-    cbs = [summary_writer(summary_path)]#, saver(model_path, coord.saver)]
-    coord.train(options.env, callbacks=cbs)
+    coord.train(options.env)

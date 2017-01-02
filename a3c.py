@@ -4,12 +4,16 @@ import os
 import gym
 import threading
 import multiprocessing
+import time
 from gym import spaces
 
 from keras import backend as K
 from keras.layers import Dense
 from models import *
 from util import *
+
+# Global episode step
+E = 0
 
 class AC_Network():
     def __init__(self, model_builder, num_actions, scope):
@@ -54,30 +58,14 @@ class AC_Network():
             self.train = optimizer.apply_gradients(zip(grads, global_vars))
 
 class A3CAgent:
-    def __init__(self, env, name, model, discount, callbacks):
-        # Name of the worker
+    def __init__(self, env, name, model, discount, update_summary, max_buffer=32):
+        self.env = env
         self.name = name
-        # Discount factor
         self.discount = discount
-        # Graph the metrics
-        self.metrics = {
-            'value_loss': [],
-            'policy_loss': [],
-            'grad_norm': [],
-            'var_norm': [],
-            'rewards': [],
-            'lengths': [],
-            'mean_values': []
-        }
-
-        self.callbacks = callbacks
-
-        # Local copy of the model
+        self.update_summary = update_summary
         self.model = model
         self.update_local_ops = update_target_graph('global', self.name)
-
-        self.env = env
-        self.max_buffer = 30
+        self.max_buffer = max_buffer
 
     def train(self,
             sess,
@@ -119,10 +107,12 @@ class A3CAgent:
         N = len(observations)
 
         # Record metrics
-        self.metrics['value_loss'].append(v_l / N)
-        self.metrics['policy_loss'].append(p_l / N)
-        self.metrics['grad_norm'].append(g_n / N)
-        self.metrics['var_norm'].append(v_n / N)
+        self.update_summary(sess, {
+            'value_loss': v_l / N,
+            'policy_loss': p_l / N,
+            'grad_norm': g_n / N,
+            'var_norm': v_n / N
+        })
 
     def preprocess(self, observation):
         """
@@ -135,17 +125,16 @@ class A3CAgent:
     def run(self, sess, coord, learn=True):
         self.episode_count = 0
 
-        print("Starting worker " + str(self.name))
+        print("Running worker " + str(self.name))
         with sess.as_default(), sess.graph.as_default():
             while not coord.should_stop():
                 self.run_episode(sess, learn)
                 self.episode_count += 1
 
-                # Execute callbacks
-                for cb in self.callbacks:
-                    cb(self)
-
     def run_episode(self, sess, learn=True):
+        # We use global shared episode counter E
+        global E
+
         # Sync local network with global network
         sess.run(self.update_local_ops)
 
@@ -228,11 +217,13 @@ class A3CAgent:
                 values,
                 0.0
             )
-
+        E += 1
         # Record metrics
-        self.metrics['rewards'].append(total_reward)
-        self.metrics['lengths'].append(episode_step_count)
-        self.metrics['mean_values'].append(total_value / episode_step_count)
+        self.update_summary(sess, {
+            'rewards': total_reward,
+            'lengths': episode_step_count,
+            'mean_values': total_value / episode_step_count
+        })
         return observation
 
 class A3CCoordinator:
@@ -256,13 +247,24 @@ class A3CCoordinator:
 
         with tf.Session() as sess:
             workers = []
+
+            update_summary, summary_op = build_summaries([
+                'rewards',
+                'grad_norm',
+                'lengths',
+                'mean_values',
+                'policy_loss',
+                'value_loss',
+                'var_norm'
+            ])
+
             # Create worker classes
             for i in range(num_workers):
                 env = gym.make(env_name)
                 name = 'worker_' + str(i)
                 model = AC_Network(self.model_builder, self.num_actions, name)
                 model.compile(optimizer)
-                workers.append(A3CAgent(env, name, model, discount, callbacks))
+                workers.append(A3CAgent(env, name, model, discount, update_summary, callbacks))
 
             # Initialize variables
             sess.run(tf.global_variables_initializer())
@@ -272,7 +274,33 @@ class A3CCoordinator:
             # Start the "work" process for each worker in a separate threat.
             worker_threads = []
             for worker in workers:
-                t = threading.Thread(target=lambda: worker.run(sess, coord))
+                t = threading.Thread(target=worker.run, args=(sess, coord))
                 t.start()
                 worker_threads.append(t)
+
+            # Add thread to write summary
+            t = threading.Thread(target=summary_worker, args=(sess, summary_op))
+            t.start()
+            worker_threads.append(t)
+
             coord.join(worker_threads)
+
+def summary_worker(sess, summary_op, flush_interval=1, save_path='out/summary'):
+    """
+    Worker thread that updates the summary every interval
+    """
+    last_summary_time = 0
+    prev = 0
+    writer = tf.train.SummaryWriter(save_path, sess.graph)
+
+    while True:
+        now = time.time()
+
+        if prev != E:
+            writer.add_summary(sess.run(summary_op), float(E))
+            prev = E
+
+        if now - last_summary_time > flush_interval:
+            writer.flush()
+            last_summary_time = now
+            prev = E

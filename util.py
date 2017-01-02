@@ -30,22 +30,25 @@ def action_to_shape(space):
 def one_hot(index, size):
     return [1 if index == i else 0 for i in range(size)]
 
-def summary_writer(summary_path, prefix=''):
-    writers = {}
-    def write(agent):
-        if agent.name not in writers:
-            writers[agent.name] = tf.summary.FileWriter(summary_path + '/' + agent.name)
+def build_summaries(names):
+    """ Set up some episode summary ops to visualize on tensorboard. """
+    var_cache = {}
+    new_val_cache = {}
+    update_op_cache = {}
 
-        writer = writers[agent.name]
-        summary = tf.Summary()
+    for name in names:
+        var_cache[name] = var = tf.Variable(0.)
+        tf.summary.scalar(name, var)
+        new_val_cache[name] = new_val = tf.placeholder("float")
+        update_op_cache[name] = var.assign(new_val)
 
-        for name, values in agent.metrics.items():
-            summary.value.add(tag=prefix + '/' + name, simple_value=float(values[-1]))
+    def update_summary(sess, update_dict):
+        ops = [ update_op_cache[name] for name in update_dict.keys() ]
+        feed = { new_val_cache[name]: val for name, val in update_dict.items() }
+        sess.run(ops, feed)
 
-        writer.add_summary(summary, agent.episode_count)
-        writer.flush()
-
-    return write
+    summary_op = tf.merge_all_summaries()
+    return update_summary, summary_op
 
 def saver(model_path, saver):
     def save(agent):
