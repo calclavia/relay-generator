@@ -6,15 +6,18 @@ from optparse import OptionParser
 
 import relay_generator
 
-units = 100
-layers = 5
-
 parser = OptionParser()
 parser.add_option("-e", "--env",  help="Gym Environment")
 parser.add_option("-r", "--run",  help="Run only?")
+parser.add_option("-s", "--size",  help="Number of hidden units")
+parser.add_option("-l", "--layers",  help="Number of layers")
 (options, args) = parser.parse_args()
 
 run = True if options.run is not None else False
+units = int(options.size) if options.size is not None else 128
+layers = int(options.layers) if options.layers is not None else 5
+
+
 env = gym.make(options.env)
 # Observation space size
 state_shape = space_to_shape(env.observation_space)
