@@ -7,7 +7,7 @@ from optparse import OptionParser
 import relay_generator
 
 units = 100
-layers = 1
+layers = 3
 
 parser = OptionParser()
 parser.add_option("-e", "--env",  help="Gym Environment")
@@ -40,6 +40,7 @@ def state_saver(agent):
             f.write(np.array2string(state, separator=', '))
 """
 with tf.device("/cpu:0"):
+    # TODO: Output
     coord = A3CCoordinator(num_actions, model_builder)
     cbs = [summary_writer(summary_path)]#, saver(model_path, coord.saver)]
     coord.train(options.env, callbacks=cbs)

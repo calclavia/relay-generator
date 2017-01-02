@@ -14,14 +14,6 @@ def discount(rewards, discount):
 
     return discounted_r
 
-def z_score(x):
-    # z-score the rewards to be unit normal (variance control)
-    std = np.std(x)
-
-    if std != 0:
-        return (x - np.mean(x)) / std
-    return x - np.mean(x)
-
 def space_to_shape(space):
     if isinstance(space, spaces.Discrete):
         # One hot vectors of states

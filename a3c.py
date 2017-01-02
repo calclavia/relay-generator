@@ -12,12 +12,12 @@ from models import *
 from util import *
 
 class AC_Network():
-    def __init__(self, model, num_actions, scope):
+    def __init__(self, model_builder, num_actions, scope):
         self.scope = scope
         self.num_actions = num_actions
 
-        with tf.variable_scope(scope):
-            self.inputs, x = model
+        with tf.variable_scope(self.scope):
+            self.inputs, x = model_builder()
 
             #Output layers for policy and value estimations
             self.policy = Dense(num_actions, activation='softmax', name='policy_output')(x)
@@ -27,27 +27,31 @@ class AC_Network():
         # Only the worker network need ops for loss functions and gradient updating.
         with tf.variable_scope(self.scope):
             self.actions = tf.placeholder(shape=[None], dtype=tf.int32)
-            self.actions_onehot = tf.one_hot(self.actions, self.num_actions, dtype=tf.float32)
+            actions_hot = tf.one_hot(self.actions, self.num_actions)
             self.target_v = tf.placeholder(shape=[None], dtype=tf.float32)
             self.advantages = tf.placeholder(shape=[None], dtype=tf.float32)
 
-            self.responsible_outputs = tf.reduce_sum(self.policy * self.actions_onehot, [1])
+            responsible_outputs = tf.reduce_sum(self.policy * actions_hot, [1])
 
-            #Loss functions
-            self.value_loss = 0.5 * tf.reduce_sum(tf.square(self.target_v - tf.reshape(self.value,[-1])))
-            self.entropy = - tf.reduce_sum(self.policy * tf.log(self.policy))
-            self.policy_loss = -tf.reduce_sum(tf.log(self.responsible_outputs)*self.advantages)
+             # Value loss (Mean squared error)
+            self.value_loss = tf.reduce_mean(tf.square(self.target_v - tf.reshape(self.value, [-1])))
+            # Entropy regularization
+            self.entropy = -tf.reduce_sum(self.policy * tf.log(self.policy))
+            # Policy loss
+            self.policy_loss = -tf.reduce_sum(tf.log(responsible_outputs) * self.advantages)
+            # Learning rate for Critic is half of Actor's, so multiply by 0.5
             self.loss = 0.5 * self.value_loss + self.policy_loss - self.entropy * 0.01
 
             # Get gradients from local network using local losses
             local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
             self.gradients = tf.gradients(self.loss, local_vars)
             self.var_norms = tf.global_norm(local_vars)
+            # Clip norm of gradients
             grads, self.grad_norms = tf.clip_by_global_norm(self.gradients, 40.0)
 
             # Apply local gradients to global network
             global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
-            self.apply_grads = optimizer.apply_gradients(zip(grads, global_vars))
+            self.train = optimizer.apply_gradients(zip(grads, global_vars))
 
 class A3CAgent:
     def __init__(self, env, name, model, discount, callbacks):
@@ -101,7 +105,7 @@ class A3CAgent:
                 self.model.entropy,
                 self.model.grad_norms,
                 self.model.var_norms,
-                self.model.apply_grads
+                self.model.train
             ],
             {
                 self.model.target_v: discounted_rewards,
@@ -236,7 +240,7 @@ class A3CCoordinator:
         self.num_actions = num_actions
         self.model_builder = model_builder
         # Generate global network
-        self.model = AC_Network(model_builder(), num_actions, 'global')
+        self.model = AC_Network(model_builder, num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
 
     def load(self, sess):
@@ -256,7 +260,7 @@ class A3CCoordinator:
             for i in range(num_workers):
                 env = gym.make(env_name)
                 name = 'worker_' + str(i)
-                model = AC_Network(self.model_builder(), self.num_actions, name)
+                model = AC_Network(self.model_builder, self.num_actions, name)
                 model.compile(optimizer)
                 workers.append(A3CAgent(env, name, model, discount, callbacks))
 
