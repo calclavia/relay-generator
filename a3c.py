@@ -192,6 +192,7 @@ class A3CCoordinator:
               summary_path='out/summary/',
               num_workers=multiprocessing.cpu_count(),
               optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)):
+        print('Training')
 
         with tf.Session() as sess:
             workers = []
@@ -221,3 +222,30 @@ class A3CCoordinator:
             worker_threads.append(t)
 
             coord.join(worker_threads)
+
+    def run(self, env_name):
+        print('Running')
+        with tf.Session() as sess:
+            self.load(sess)
+            env = gym.make(env_name)
+
+            state = preprocess(env, env.reset())
+            total_reward = 0
+            terminal = False
+
+            while not terminal:
+                # Perform action according to policy pi(a_t | s_t)
+                probs, value = sess.run([self.model.policy, self.model.value], { self.model.inputs: [state] })
+
+                # Remove batch dimension
+                probs = probs[0]
+                value = value[0]
+                # Sample an action from an action probability distribution output
+                action = np.random.choice(len(probs), p=probs)
+
+                print('State', state)
+                print('Action', action)
+                state, reward, terminal, info = env.step(action)
+                print('Reward', reward)
+
+            print('Total Reward:', total_reward)

@@ -11,8 +11,10 @@ layers = 5
 
 parser = OptionParser()
 parser.add_option("-e", "--env",  help="Gym Environment")
+parser.add_option("-r", "--run",  help="Run only?")
 (options, args) = parser.parse_args()
 
+run = True if options.run is not None else False
 env = gym.make(options.env)
 # Observation space size
 state_shape = space_to_shape(env.observation_space)
@@ -41,4 +43,8 @@ def state_saver(agent):
 with tf.device("/cpu:0"):
     # TODO: Output
     coord = A3CCoordinator(num_actions, model_builder)
-    coord.train(options.env)
+
+    if run:
+        coord.run(options.env)
+    else:
+        coord.train(options.env)
