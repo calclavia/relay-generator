@@ -12,9 +12,6 @@ from keras.layers import Dense
 from models import *
 from util import *
 
-# Global episode step
-E = 0
-
 class AC_Network():
     def __init__(self, model_builder, num_actions, scope):
         self.scope = scope
@@ -58,11 +55,10 @@ class AC_Network():
             self.train = optimizer.apply_gradients(zip(grads, global_vars))
 
 class A3CAgent:
-    def __init__(self, env, name, model, discount, update_summary, max_buffer=32):
-        self.env = env
+    def __init__(self, env_name, name, model, discount, max_buffer=32):
+        self.env = gym.make(env_name)
         self.name = name
         self.discount = discount
-        self.update_summary = update_summary
         self.model = model
         self.update_local_ops = update_target_graph('global', self.name)
         self.max_buffer = max_buffer
@@ -99,42 +95,35 @@ class A3CAgent:
                 self.model.target_v: discounted_rewards,
                 self.model.inputs: np.vstack(observations),
                 self.model.actions: actions,
-                self.model.advantages: advantages,
-                K.learning_phase(): 1
+                self.model.advantages: advantages
             }
         )
 
         N = len(observations)
 
+        """
         # Record metrics
-        self.update_summary(sess, {
-            'value_loss': v_l / N,
-            'policy_loss': p_l / N,
-            'grad_norm': g_n / N,
-            'var_norm': v_n / N
-        })
-
-    def preprocess(self, observation):
+        writer.add_summary(
+            make_summary({
+                'value_loss': v_l / N,
+                'policy_loss': p_l / N,
+                'grad_norm': g_n / N,
+                'var_norm': v_n / N
+            }),
+            self.episode_count
+        )
         """
-        Preprocesses the input observation before recording it into experience
-        """
-        if isinstance(self.env.observation_space, spaces.Discrete):
-            return one_hot(observation, self.env.observation_space.n)
-        return observation
 
-    def run(self, sess, coord, learn=True):
+    def run(self, sess, coord, writer, learn=True):
         self.episode_count = 0
 
         print("Running worker " + str(self.name))
         with sess.as_default(), sess.graph.as_default():
             while not coord.should_stop():
-                self.run_episode(sess, learn)
+                self.run_episode(sess, writer, learn)
                 self.episode_count += 1
 
-    def run_episode(self, sess, learn=True):
-        # We use global shared episode counter E
-        global E
-
+    def run_episode(self, sess, writer, learn=True):
         # Sync local network with global network
         sess.run(self.update_local_ops)
 
@@ -150,13 +139,12 @@ class A3CAgent:
         episode_step_count = 0
         done = False
 
-        observation = self.preprocess(self.env.reset())
+        observation = preprocess(self.env, self.env.reset())
 
         while not done:
             # Take an action using probabilities from policy network output.
             a_dist, v = sess.run([self.model.policy, self.model.value], {
-                self.model.inputs: [observation],
-                K.learning_phase(): 0
+                self.model.inputs: [observation]
             })
 
             action = np.random.choice(a_dist[0], p=a_dist[0])
@@ -164,7 +152,7 @@ class A3CAgent:
             value = v[0, 0]
 
             next_observation, reward, done, info = self.env.step(action)
-            next_observation = self.preprocess(next_observation)
+            next_observation = preprocess(self.env, next_observation)
 
             # Bookkeeping
             states.append(observation)
@@ -217,14 +205,16 @@ class A3CAgent:
                 values,
                 0.0
             )
-        E += 1
+
         # Record metrics
-        self.update_summary(sess, {
-            'rewards': total_reward,
-            'lengths': episode_step_count,
-            'mean_values': total_value / episode_step_count
-        })
-        return observation
+        writer.add_summary(
+            make_summary({
+                'rewards': total_reward,
+                'lengths': episode_step_count,
+                'mean_values': total_value / episode_step_count
+            }),
+            self.episode_count
+        )
 
 class A3CCoordinator:
     def __init__(self, num_actions, model_builder):
@@ -241,30 +231,20 @@ class A3CCoordinator:
     def train(self,
               env_name,
               discount=.99,
-              callbacks=[],
+              summary_path='out/summary/',
               num_workers=multiprocessing.cpu_count(),
               optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)):
 
         with tf.Session() as sess:
             workers = []
-
-            update_summary, summary_op = build_summaries([
-                'rewards',
-                'grad_norm',
-                'lengths',
-                'mean_values',
-                'policy_loss',
-                'value_loss',
-                'var_norm'
-            ])
+            summaries = []
 
             # Create worker classes
             for i in range(num_workers):
-                env = gym.make(env_name)
                 name = 'worker_' + str(i)
                 model = AC_Network(self.model_builder, self.num_actions, name)
                 model.compile(optimizer)
-                workers.append(A3CAgent(env, name, model, discount, update_summary, callbacks))
+                workers.append(A3CAgent(env_name, name, model, discount))
 
             # Initialize variables
             sess.run(tf.global_variables_initializer())
@@ -273,34 +253,16 @@ class A3CCoordinator:
             # This is where the asynchronous magic happens.
             # Start the "work" process for each worker in a separate threat.
             worker_threads = []
+
             for worker in workers:
-                t = threading.Thread(target=worker.run, args=(sess, coord))
+                writer = tf.train.SummaryWriter(summary_path + worker.name, sess.graph)
+                t = threading.Thread(target=worker.run, args=(sess, coord, writer))
                 t.start()
                 worker_threads.append(t)
 
             # Add thread to write summary
-            t = threading.Thread(target=summary_worker, args=(sess, summary_op))
+            t = threading.Thread(target=summary_flusher, args=(sess, writer))
             t.start()
             worker_threads.append(t)
 
             coord.join(worker_threads)
-
-def summary_worker(sess, summary_op, flush_interval=1, save_path='out/summary'):
-    """
-    Worker thread that updates the summary every interval
-    """
-    last_summary_time = 0
-    prev = 0
-    writer = tf.train.SummaryWriter(save_path, sess.graph)
-
-    while True:
-        now = time.time()
-
-        if prev != E:
-            writer.add_summary(sess.run(summary_op), float(E))
-            prev = E
-
-        if now - last_summary_time > flush_interval:
-            writer.flush()
-            last_summary_time = now
-            prev = E
