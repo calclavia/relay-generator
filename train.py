@@ -7,7 +7,7 @@ from optparse import OptionParser
 import relay_generator
 
 units = 100
-layers = 3
+layers = 5
 
 parser = OptionParser()
 parser.add_option("-e", "--env",  help="Gym Environment")
@@ -21,12 +21,11 @@ num_actions = action_to_shape(env.action_space)
 
 # Directories
 output_path = './out'
+summary_path = output_path + '/summary'
 model_path = output_path + '/model'
-state_path = output_path + '/states'
-summary_path = output_path + '/tb'
 
 # Make directories for outputs
-for path in [model_path, state_path, summary_path]:
+for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 

@@ -53,12 +53,12 @@ def make_summary(data, prefix=''):
 
     return summary
 
-def saver(model_path, saver):
-    def save(agent):
-        if agent.name == 'worker_1' and agent.episode_count % 100 == 0:
-            saver.save(sess, model_path + '/model-' +
-                       str(agent.episode_count) + '.cptk')
-    return save
+
+def save_worker(sess, agent):
+    while True:
+        time.sleep(30)
+        print('Saving model...')
+        agent.save(sess)
 
 def update_target_graph(from_scope, to_scope):
     """

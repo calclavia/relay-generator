@@ -72,7 +72,6 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
 
     print("Running worker " + str(num))
 
-    # TODO: Do we need this?
     with sess.as_default(), sess.graph.as_default():
         while not coord.should_stop():
             # Sync local network with global network
@@ -172,16 +171,20 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 episode_step_count = 0
 
 class A3CCoordinator:
-    def __init__(self, num_actions, model_builder):
+    def __init__(self, num_actions, model_builder, model_path='out/model'):
         self.num_actions = num_actions
         self.model_builder = model_builder
         # Generate global network
         self.model = AC_Network(model_builder, num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
+        self.model_path = model_path
 
     def load(self, sess):
-        ckpt = tf.train.get_checkpoint_state(model_path)
+        ckpt = tf.train.get_checkpoint_state(self.model_path)
         self.saver.restore(sess, ckpt.model_checkpoint_path)
+
+    def save(self, sess):
+        self.saver.save(sess, self.model_path + '/model.cptk')
 
     def train(self,
               env_name,
@@ -199,7 +202,7 @@ class A3CCoordinator:
                 model = AC_Network(self.model_builder, self.num_actions, name)
                 model.compile(optimizer)
                 sync = update_target_graph('global', name)
-                workers.append((model, sync))
+                workers.append((name, model, sync))
 
             # Initialize variables
             sess.run(tf.global_variables_initializer())
@@ -207,10 +210,14 @@ class A3CCoordinator:
             coord = tf.train.Coordinator()
             worker_threads = []
 
-            for i, (model, sync) in enumerate(workers):
+            for i, (name, model, sync) in enumerate(workers):
                 writer = tf.train.SummaryWriter(summary_path + name, sess.graph)
                 t = threading.Thread(target=a3c_worker, args=(sess, coord, writer, env_name, i, model, sync, discount))
                 t.start()
                 worker_threads.append(t)
+
+            t = threading.Thread(target=save_worker, args=(sess, self))
+            t.start()
+            worker_threads.append(t)
 
             coord.join(worker_threads)
