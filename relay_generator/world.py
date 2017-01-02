@@ -7,9 +7,8 @@ class World:
     """
     def __init__(self, dim):
         # Blocks in the world as a matrix
-        self.blocks = np.zeros(dim, dtype=np.int)
-        # A list of directions for the emitter
-        self.directions = []
+        self.blocks = np.empty(dim, dtype=np.int)
+        self.blocks.fill(BlockType.solid.value)
 
     def in_bounds(self, pos):
         return pos[0] >= 0 and pos[1] >= 0 and\
@@ -38,8 +37,6 @@ class World:
         return i
 
 class BlockType(Enum):
-    null = 0
     empty = 1
     solid = 2
     start = 3
-    end = 4

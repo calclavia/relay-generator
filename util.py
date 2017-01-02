@@ -54,7 +54,7 @@ def make_summary(data, prefix=''):
     return summary
 
 
-def save_worker(sess, agent):
+def save_worker(sess, coord, agent):
     while True:
         time.sleep(30)
         print('Saving model...')

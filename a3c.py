@@ -212,12 +212,12 @@ class A3CCoordinator:
             worker_threads = []
 
             for i, (name, model, sync) in enumerate(workers):
-                writer = tf.train.SummaryWriter(summary_path + name, sess.graph)
+                writer = tf.summary.FileWriter(summary_path + name, sess.graph)
                 t = threading.Thread(target=a3c_worker, args=(sess, coord, writer, env_name, i, model, sync, discount))
                 t.start()
                 worker_threads.append(t)
 
-            t = threading.Thread(target=save_worker, args=(sess, self))
+            t = threading.Thread(target=save_worker, args=(sess, coord, self))
             t.start()
             worker_threads.append(t)
 
