@@ -1,8 +1,8 @@
 from keras import backend as K
+import time
 import numpy as np
 import tensorflow as tf
 from gym import spaces
-
 
 def space_to_shape(space):
     if isinstance(space, spaces.Discrete):
@@ -23,10 +23,9 @@ def one_hot(index, size):
     return [1 if index == i else 0 for i in range(size)]
 
 
-def discount(rewards, discount):
+def discount(rewards, discount, current=0):
     """ Takes an array of rewards and compute array of discounted reward """
     discounted_r = np.zeros_like(rewards)
-    current = 0
 
     for t in reversed(range(len(rewards))):
         current = current * discount + rewards[t]
@@ -50,7 +49,7 @@ def make_summary(data, prefix=''):
 
     summary = tf.Summary()
     for name, value in data.items():
-        summary.value.add(tag=prefix + name, simple_value=value)
+        summary.value.add(tag=prefix + name, simple_value=float(value))
 
     return summary
 
@@ -60,19 +59,6 @@ def saver(model_path, saver):
             saver.save(sess, model_path + '/model-' +
                        str(agent.episode_count) + '.cptk')
     return save
-
-def summary_flusher(sess, writer, flush_interval=1):
-    """
-    Worker thread that flushes the summary every interval
-    """
-    last_summary_time = 0
-
-    while True:
-        now = time.time()
-
-        if now - last_summary_time > flush_interval:
-            writer.flush()
-            last_summary_time = now
 
 def update_target_graph(from_scope, to_scope):
     """

@@ -54,167 +54,122 @@ class AC_Network():
             global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
             self.train = optimizer.apply_gradients(zip(grads, global_vars))
 
-class A3CAgent:
-    def __init__(self, env_name, name, model, discount, max_buffer=32):
-        self.env = gym.make(env_name)
-        self.name = name
-        self.discount = discount
-        self.model = model
-        self.update_local_ops = update_target_graph('global', self.name)
-        self.max_buffer = max_buffer
+def a3c_worker(sess, coord, writer, env_name, num, model, sync,
+               gamma, max_buffer=32, stagger=1):
+    # Thread setup
+    env = gym.make(env_name)
 
-    def train(self,
-            sess,
-            observations,
-            actions,
-            rewards,
-            next_observations,
-            values,
-            bootstrap_value):
+    episode_count = 0
 
-        # Here we take the rewards and values from the exp, and use them to
-        # generate the advantage and discounted returns.
-        # The advantage function uses "Generalized Advantage Estimation"
-        rewards_plus = rewards + [bootstrap_value]
-        discounted_rewards = discount(rewards_plus, self.discount)[:-1]
-        value_plus = np.array(values + [bootstrap_value])
-        advantages = rewards + self.discount * value_plus[1:] - value_plus[:-1]
-        advantages = discount(advantages, self.discount)
+    # Stagger threads to decorrelate experience
+    time.sleep(stagger * num)
 
-        # Update the global network using gradients from loss
-        # Generate network statistics to periodically save
-        v_l, p_l, e_l, g_n, v_n, _ = sess.run([
-                self.model.value_loss,
-                self.model.policy_loss,
-                self.model.entropy,
-                self.model.grad_norms,
-                self.model.var_norms,
-                self.model.train
-            ],
-            {
-                self.model.target_v: discounted_rewards,
-                self.model.inputs: np.vstack(observations),
-                self.model.actions: actions,
-                self.model.advantages: advantages
-            }
-        )
+    # Reset per-episode vars
+    state = preprocess(env, env.reset())
+    terminal = False
+    total_reward = 0
+    episode_step_count = 0
 
-        N = len(observations)
+    print("Running worker " + str(num))
 
-        """
-        # Record metrics
-        writer.add_summary(
-            make_summary({
-                'value_loss': v_l / N,
-                'policy_loss': p_l / N,
-                'grad_norm': g_n / N,
-                'var_norm': v_n / N
-            }),
-            self.episode_count
-        )
-        """
+    # TODO: Do we need this?
+    with sess.as_default(), sess.graph.as_default():
+        while not coord.should_stop():
+            # Sync local network with global network
+            sess.run(sync)
 
-    def run(self, sess, coord, writer, learn=True):
-        self.episode_count = 0
+            # Run a training batch
+            t = 0
+            t_start = t
 
-        print("Running worker " + str(self.name))
-        with sess.as_default(), sess.graph.as_default():
-            while not coord.should_stop():
-                self.run_episode(sess, writer, learn)
-                self.episode_count += 1
+            states = []
+            rewards = []
+            actions = []
+            values = []
 
-    def run_episode(self, sess, writer, learn=True):
-        # Sync local network with global network
-        sess.run(self.update_local_ops)
+            while not (terminal or ((t - t_start) == max_buffer)):
+                # Perform action according to policy pi(a_t | s_t)
+                probs, value = sess.run([model.policy, model.value], { model.inputs: [state] })
 
-        # Buffer the data obtained during the episode
-        values = []
-        states = []
-        next_states = []
-        actions = []
-        rewards = []
+                # Remove batch dimension
+                probs = probs[0]
+                value = value[0]
+                # Sample an action from an action probability distribution output
+                action = np.random.choice(len(probs), p=probs)
 
-        total_reward = 0
-        total_value = 0
-        episode_step_count = 0
-        done = False
+                states.append(state)
+                actions.append(action)
+                values.append(value)
 
-        observation = preprocess(self.env, self.env.reset())
+                next_state, reward, terminal, info = env.step(action)
+                next_state = preprocess(env, next_state)
 
-        while not done:
-            # Take an action using probabilities from policy network output.
-            a_dist, v = sess.run([self.model.policy, self.model.value], {
-                self.model.inputs: [observation]
-            })
+                # TODO: Reward clipping? Experiment >2 tasks
+                # r_t = np.clip(r_t, -1, 1)
+                rewards.append(reward)
 
-            action = np.random.choice(a_dist[0], p=a_dist[0])
-            action = np.argmax(a_dist == action)
-            value = v[0, 0]
+                total_reward += reward
+                episode_step_count += 1
+                t += 1
 
-            next_observation, reward, done, info = self.env.step(action)
-            next_observation = preprocess(self.env, next_observation)
+                state = next_state
 
-            # Bookkeeping
-            states.append(observation)
-            next_states.append(next_observation)
-            rewards.append(reward)
-            actions.append(action)
-            values.append(value)
+            if terminal:
+                reward = 0
+            else:
+                # Bootstrap from last state
+                reward = sess.run(model.value, {model.inputs: [state]})[0][0]
 
-            total_value += value
-            total_reward += reward
-            observation = next_observation
-            episode_step_count += 1
+            # Here we take the rewards and values from the exp, and use them to
+            # generate the advantage and discounted returns.
+            # The advantage function uses "Generalized Advantage Estimation"
+            discounted_rewards = discount(rewards, gamma, reward)
+            value_plus = np.array(values + [reward])
+            advantages = discount(rewards + gamma * value_plus[1:] - value_plus[:-1], gamma)
 
-            # If the episode hasn't ended, but the experience buffer is
-            # full, then we make an update step using that experience.
-            if learn and len(states) == self.max_buffer and not done:
-                # Since we don't know what the true final return is,
-                # we "bootstrap" from our current value estimation.
-                v1 = sess.run(self.model.value, {
-                    self.model.inputs: [observation],
-                    K.learning_phase(): 0
-                })[0,0]
-
-                self.train(
-                    sess,
-                    states,
-                    actions,
-                    rewards,
-                    next_states,
-                    values,
-                    v1
-                )
-
-                values = []
-                states = []
-                next_states = []
-                actions = []
-                rewards = []
-
-                sess.run(self.update_local_ops)
-
-        if learn:
-            # Train the network using the experience buffer at the end of the episode.
-            self.train(
-                sess,
-                states,
-                actions,
-                rewards,
-                next_states,
-                values,
-                0.0
+            # Train network
+            v_l, p_l, e_l, g_n, v_n, _ = sess.run([
+                    model.value_loss,
+                    model.policy_loss,
+                    model.entropy,
+                    model.grad_norms,
+                    model.var_norms,
+                    model.train
+                ],
+                {
+                    model.target_v: discounted_rewards,
+                    model.inputs: states,
+                    model.actions: actions,
+                    model.advantages: advantages
+                }
             )
 
-        # Record metrics
-        writer.add_summary(
-            make_summary({
-                'rewards': total_reward,
-                'lengths': episode_step_count,
-                'mean_values': total_value / episode_step_count
-            }),
-            self.episode_count
-        )
+            if terminal:
+                # Record metrics
+                writer.add_summary(
+                    make_summary({
+                        'rewards': total_reward,
+                        'lengths': episode_step_count,
+                        'value_loss': v_l,
+                        'policy_loss': p_l,
+                        'entropy_loss': e_l,
+                        'grad_norm': g_n,
+                        'value_norm': v_n,
+                        'mean_values': np.mean(values)
+                    }),
+                    episode_count
+                )
+
+                if episode_count % 10 == 0:
+                    writer.flush()
+
+                # Reset per-episode vars
+                episode_count += 1
+                state = preprocess(env, env.reset())
+                terminal = False
+                total_reward = 0
+                total_value = 0
+                episode_step_count = 0
 
 class A3CCoordinator:
     def __init__(self, num_actions, model_builder):
@@ -237,32 +192,25 @@ class A3CCoordinator:
 
         with tf.Session() as sess:
             workers = []
-            summaries = []
 
             # Create worker classes
             for i in range(num_workers):
                 name = 'worker_' + str(i)
                 model = AC_Network(self.model_builder, self.num_actions, name)
                 model.compile(optimizer)
-                workers.append(A3CAgent(env_name, name, model, discount))
+                sync = update_target_graph('global', name)
+                workers.append((model, sync))
 
             # Initialize variables
             sess.run(tf.global_variables_initializer())
 
             coord = tf.train.Coordinator()
-            # This is where the asynchronous magic happens.
-            # Start the "work" process for each worker in a separate threat.
             worker_threads = []
 
-            for worker in workers:
-                writer = tf.train.SummaryWriter(summary_path + worker.name, sess.graph)
-                t = threading.Thread(target=worker.run, args=(sess, coord, writer))
+            for i, (model, sync) in enumerate(workers):
+                writer = tf.train.SummaryWriter(summary_path + name, sess.graph)
+                t = threading.Thread(target=a3c_worker, args=(sess, coord, writer, env_name, i, model, sync, discount))
                 t.start()
                 worker_threads.append(t)
-
-            # Add thread to write summary
-            t = threading.Thread(target=summary_flusher, args=(sess, writer))
-            t.start()
-            worker_threads.append(t)
 
             coord.join(worker_threads)
