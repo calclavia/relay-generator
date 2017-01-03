@@ -37,7 +37,7 @@ class Experience(NullExperience):
         self.observations.append(observation)
 
     def act(self, action):
-        self.actions.append(one_hot(action, self.action_space.n))
+        self.actions.append(action)
 
     def reward(self, reward):
         self.rewards.append(reward)

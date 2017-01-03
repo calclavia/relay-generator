@@ -36,14 +36,15 @@ def dense(input_shape, num_h, layers, dropout=0, regularization=0):
 
     return inputs, x
 
-def dense_1(input_shape):
+def dense_1(input_shape, time_steps):
     # Build Network
     # Dropout hyper-parameters based on Hinton's paper
-    inputs = x = Input(shape=input_shape, name='input')
+    inputs = x = Input(shape=(time_steps,) + input_shape, name='input')
+    x = LSTM(128, activation='relu', name='lstm')(x)
 #    x = Dropout(0.1)(x)
-    x = Dense(128, activation='relu', name='hidden1')(x)
+    x = Dense(256, activation='relu', name='hidden1')(x)
 #    x = Dropout(0.1)(x)
-    x = Dense(256, activation='relu', name='hidden2')(x)
+    x = Dense(512, activation='relu', name='hidden2')(x)
 #    x = Dropout(0.25)(x)
     x = Dense(512, activation='relu', name='hidden3')(x)
 #    x = Dropout(0.25)(x)

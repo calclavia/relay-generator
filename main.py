@@ -16,6 +16,7 @@ parser.add_option("-l", "--layers",  help="Number of layers")
 run = True if options.run is not None else False
 units = int(options.size) if options.size is not None else 128
 layers = int(options.layers) if options.layers is not None else 5
+time_steps = 5
 
 env = gym.make(options.env)
 # Observation space size
@@ -33,11 +34,11 @@ for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-model_builder = lambda: dense_1(state_shape) # dense(state_shape, units, layers, dropout=0.25)
+model_builder = lambda: dense_1(state_shape, time_steps) # dense(state_shape, units, layers, dropout=0.25)
 
 with tf.device("/cpu:0"):
     # TODO: Output
-    coord = A3CCoordinator(num_actions, model_builder)
+    coord = A3CCoordinator(num_actions, model_builder, time_steps=time_steps)
 
     if run:
         coord.run(options.env)

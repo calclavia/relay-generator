@@ -12,6 +12,7 @@ from keras.layers import Dense
 from keras.models import Model
 from models import *
 from util import *
+from experience import *
 
 class AC_Network():
     def __init__(self, model_builder, num_actions, scope, beta=1e-2):
@@ -59,7 +60,7 @@ class AC_Network():
             self.train = optimizer.apply_gradients(zip(grads, global_vars))
 
 def a3c_worker(sess, coord, writer, env_name, num, model, sync,
-               gamma, max_buffer=32, stagger=1):
+               gamma, time_steps, max_buffer=32, stagger=1):
     # Thread setup
     env = gym.make(env_name)
 
@@ -85,15 +86,15 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
             t = 0
             t_start = t
 
-            states = []
-            rewards = []
-            actions = []
+            exp = TemporalExperience(env.observation_space, env.action_space, time_steps)
             values = []
 
             while not (terminal or ((t - t_start) == max_buffer)):
+                exp.observe(state)
+
                 # Perform action according to policy pi(a_t | s_t)
                 probs, value = sess.run([model.policy, model.value], {
-                    model.inputs: [state],
+                    model.inputs: [exp.get_state()],
                     K.learning_phase(): 0
                 })
 
@@ -103,8 +104,7 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 # Sample an action from an action probability distribution output
                 action = np.random.choice(len(probs), p=probs)
 
-                states.append(state)
-                actions.append(action)
+                exp.act(action)
                 values.append(value)
 
                 next_state, reward, terminal, info = env.step(action)
@@ -112,7 +112,7 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
 
                 # TODO: Reward clipping? Experiment >2 tasks
                 # r_t = np.clip(r_t, -1, 1)
-                rewards.append(reward)
+                exp.reward(reward)
 
                 total_reward += reward
                 episode_step_count += 1
@@ -125,16 +125,16 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
             else:
                 # Bootstrap from last state
                 reward = sess.run(model.value, {
-                    model.inputs: [state],
+                    model.inputs: [exp.get_state()],
                     K.learning_phase(): 0
                 })[0][0]
 
             # Here we take the rewards and values from the exp, and use them to
             # generate the advantage and discounted returns.
             # The advantage function uses "Generalized Advantage Estimation"
-            discounted_rewards = discount(rewards, gamma, reward)
+            discounted_rewards = discount(exp.rewards, gamma, reward)
             value_plus = np.array(values + [reward])
-            advantages = discount(rewards + gamma * value_plus[1:] - value_plus[:-1], gamma)
+            advantages = discount(exp.rewards + gamma * value_plus[1:] - value_plus[:-1], gamma)
 
             # Train network
             v_l, p_l, e_l, g_n, v_n, _ = sess.run([
@@ -147,8 +147,8 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 ],
                 {
                     model.target_v: discounted_rewards,
-                    model.inputs: states,
-                    model.actions: actions,
+                    model.inputs: exp.get_states(),
+                    model.actions: exp.actions,
                     model.advantages: advantages,
                     K.learning_phase(): 1
                 }
@@ -182,13 +182,14 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 episode_step_count = 0
 
 class A3CCoordinator:
-    def __init__(self, num_actions, model_builder, model_path='out/model'):
+    def __init__(self, num_actions, model_builder, time_steps=1, model_path='out/model'):
         self.num_actions = num_actions
         self.model_builder = model_builder
+        self.time_steps = time_steps
+        self.model_path = model_path
         # Generate global network
         self.model = AC_Network(model_builder, num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
-        self.model_path = model_path
 
         print(self.model.model.summary())
 
@@ -226,7 +227,7 @@ class A3CCoordinator:
 
             for i, (name, model, sync) in enumerate(workers):
                 writer = tf.summary.FileWriter(summary_path + name, sess.graph)
-                t = threading.Thread(target=a3c_worker, args=(sess, coord, writer, env_name, i, model, sync, discount))
+                t = threading.Thread(target=a3c_worker, args=(sess, coord, writer, env_name, i, model, sync, discount, self.time_steps))
                 t.start()
                 worker_threads.append(t)
 
@@ -259,9 +260,10 @@ class A3CCoordinator:
                 # Sample an action from an action probability distribution output
                 action = np.random.choice(len(probs), p=probs)
                 # TODO: Don't hardcode this
-                print('State', state[:-1].reshape(9,9))
+                print('State', state[:-3].reshape(9,9))
                 print('Action', action)
                 state, reward, terminal, info = env.step(action)
                 print('Reward', reward)
+                total_reward += reward
 
             print('Total Reward:', total_reward)
