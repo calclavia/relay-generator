@@ -40,11 +40,11 @@ def dense_1(input_shape):
     # Build Network
     # Dropout hyper-parameters based on Hinton's paper
     inputs = x = Input(shape=input_shape, name='input')
-    x = Dropout(0.1)(x)
+#    x = Dropout(0.1)(x)
     x = Dense(128, activation='relu', name='hidden1')(x)
-    x = Dropout(0.25)(x)
+#    x = Dropout(0.1)(x)
     x = Dense(256, activation='relu', name='hidden2')(x)
-    x = Dropout(0.5)(x)
+#    x = Dropout(0.25)(x)
     x = Dense(512, activation='relu', name='hidden3')(x)
-    x = Dropout(0.5)(x)
+#    x = Dropout(0.25)(x)
     return inputs, x

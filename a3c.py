@@ -14,9 +14,11 @@ from models import *
 from util import *
 
 class AC_Network():
-    def __init__(self, model_builder, num_actions, scope):
+    def __init__(self, model_builder, num_actions, scope, beta=1e-2):
         self.scope = scope
         self.num_actions = num_actions
+        # Entropy weight
+        self.beta = beta
 
         with tf.variable_scope(self.scope):
             self.inputs, x = model_builder()
@@ -38,11 +40,12 @@ class AC_Network():
              # Value loss (Mean squared error)
             self.value_loss = tf.reduce_mean(tf.square(self.target_v - tf.reshape(self.value, [-1])))
             # Entropy regularization
-            self.entropy = -tf.reduce_sum(self.policy * tf.log(self.policy))
+            self.entropy = -tf.reduce_sum(self.policy * tf.log(self.policy + 1e-9))
             # Policy loss
             self.policy_loss = -tf.reduce_sum(tf.log(responsible_outputs) * self.advantages)
             # Learning rate for Critic is half of Actor's, so multiply by 0.5
-            self.loss = 0.5 * self.value_loss + self.policy_loss - self.entropy * 0.01
+            # TODO: In very sprase rewards, entropy loss causes NAN..., even when BETA = 0
+            self.loss = 0.5 * self.value_loss + self.policy_loss - self.beta * self.entropy
 
             # Get gradients from local network using local losses
             local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
@@ -255,8 +258,8 @@ class A3CCoordinator:
                 value = value[0]
                 # Sample an action from an action probability distribution output
                 action = np.random.choice(len(probs), p=probs)
-
-                print('State', state)
+                # TODO: Don't hardcode this
+                print('State', state[:-1].reshape(9,9))
                 print('Action', action)
                 state, reward, terminal, info = env.step(action)
                 print('Reward', reward)

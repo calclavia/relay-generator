@@ -20,7 +20,8 @@ class RelayEnv(gym.Env):
         # Observe the world
         self.observation_space = spaces.Tuple(
             tuple(spaces.Discrete(num_block_type) for _ in range(self.size)) +
-            (spaces.Box(0, 1000, shape=(1)),)
+            (spaces.Discrete(dim[0]), spaces.Discrete(dim[1])) +
+            (spaces.Box(4, 10, shape=(1)),)
         )
 
         # Actions allow the world to be populated.
@@ -37,25 +38,26 @@ class RelayEnv(gym.Env):
         if not self.world.in_bounds(self.pos):
             # We went out of the map
             done = True
-            # reward -= 1
-        elif self.world.blocks[self.pos] == BlockType.empty.value:
+            reward -= 1
+        elif self.pos in self.visited:
             # We went back to a previous position
             done = True
-            # reward -= 1
+            reward -= 1
         elif self.world.blocks[self.pos] == BlockType.start.value:
             # We've came back!
             done = True
-            reward += 1
+            reward += self.size
             # Additional rewards
-            #reward += 1 / (self.difficulty - self.turns + 1)
+            reward += self.size / (self.difficulty - self.turns + 1)
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
             if direction != self.prev_dir:
                 self.turns += 1
                 self.prev_dir = direction
-            # reward += 1
+            reward += 1
 
+        self.visited.append(self.pos)
         self.actions += 1
         return self.build_observation(), reward, done, {}
 
@@ -65,6 +67,7 @@ class RelayEnv(gym.Env):
         # Number of turns made
         self.turns = 0
         self.prev_dir = None
+        self.visited = []
 
         self.world = World(self.dim)
         # Generate random starting position
@@ -72,12 +75,12 @@ class RelayEnv(gym.Env):
         self.world.blocks[self.pos] = BlockType.start.value
         # Generate random difficulty
         self.difficulty = np.random.uniform(4, 10)
-
+        self.visited.append(self.pos)
         return self.build_observation()
 
     def build_observation(self):
         blocks = np.array(self.world.blocks.flatten(), dtype='float')
-        return np.concatenate((blocks, [self.difficulty]))
+        return np.concatenate((blocks, np.array(self.pos), [self.difficulty]))
 
     def _render(self, mode='human', close=False):
         pass
