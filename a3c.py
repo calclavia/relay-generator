@@ -5,6 +5,7 @@ import gym
 import threading
 import multiprocessing
 import time
+from collections import deque
 from gym import spaces
 
 from keras import backend as K
@@ -12,7 +13,6 @@ from keras.layers import Dense
 from keras.models import Model
 from models import *
 from util import *
-from experience import *
 
 class AC_Network():
     def __init__(self, model_builder, num_actions, scope, beta=1e-2):
@@ -59,21 +59,45 @@ class AC_Network():
             global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
             self.train = optimizer.apply_gradients(zip(grads, global_vars))
 
+class Memory:
+    def __init__(self, init_state, time_steps):
+        self._memory = []
+        # TODO: Handle non-tuple inputs?
+        for input_state in init_state:
+            # lookback buffer
+            temporal_memory = deque(maxlen=time_steps)
+            # Fill temporal memory with zeros
+            while len(temporal_memory) < time_steps - 1:
+                temporal_memory.appendleft(np.zeros_like(input_state))
+
+            temporal_memory.append(input_state)
+            self._memory.append(temporal_memory)
+
+    def remember(self, state):
+        for i, input_state in enumerate(state):
+            self._memory[i].append(input_state)
+
+    def to_states(self):
+        """ Returns a state per input """
+        return [list(m) for m in self._memory]
+
+    def build_single_feed(self, inputs):
+        return { i: [list(m)] for i, m in zip(inputs, self._memory) }
+
 def a3c_worker(sess, coord, writer, env_name, num, model, sync,
-               gamma, time_steps, max_buffer=32, stagger=1):
+               gamma, time_steps, max_buffer=32):
     # Thread setup
     env = gym.make(env_name)
+    ob_space = env.observation_space
 
     episode_count = 0
 
-    # Stagger threads to decorrelate experience
-    time.sleep(stagger * num)
-
     # Reset per-episode vars
-    state = preprocess(env.observation_space, env.reset())
     terminal = False
     total_reward = 0
-    episode_step_count = 0
+    step_count = 0
+    # Each memory corresponds to one input.
+    memory = Memory(preprocess(ob_space, env.reset()), time_steps)
 
     print("Running worker " + str(num))
 
@@ -86,16 +110,17 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
             t = 0
             t_start = t
 
-            exp = TemporalExperience(env.observation_space, env.action_space, time_steps)
+            # Batched based variables
+            state_batches = [[] for _ in model.inputs]
+            actions = []
+            rewards = []
             values = []
 
             while not (terminal or ((t - t_start) == max_buffer)):
-                exp.observe(state)
-
                 # Perform action according to policy pi(a_t | s_t)
                 probs, value = sess.run(
                     [model.policy, model.value],
-                    build_feed(model.inputs, exp.get_state())
+                    memory.build_single_feed(model.inputs)
                 )
 
                 # Remove batch dimension
@@ -104,36 +129,38 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 # Sample an action from an action probability distribution output
                 action = np.random.choice(len(probs), p=probs)
 
-                exp.act(action)
-                values.append(value)
-
                 next_state, reward, terminal, info = env.step(action)
                 next_state = preprocess(env.observation_space, next_state)
 
-                exp.reward(reward)
+                # Bookkeeping
+                for i, state in enumerate(memory.to_states()):
+                    state_batches[i].append(state)
+
+                memory.remember(next_state)
+                actions.append(action)
+                values.append(value)
+                rewards.append(reward)
 
                 total_reward += reward
-                episode_step_count += 1
+                step_count += 1
                 t += 1
-
-                state = next_state
 
             if terminal:
                 reward = 0
             else:
-                # TODO: Duplicate calculation
+                # TODO: Check if this bootstrap is correct?
                 # Bootstrap from last state
                 reward = sess.run(
                     model.value,
-                    build_feed(model.inputs, exp.get_state())
+                    memory.build_single_feed(model.inputs)
                 )[0][0]
 
             # Here we take the rewards and values from the exp, and use them to
             # generate the advantage and discounted returns.
             # The advantage function uses "Generalized Advantage Estimation"
-            discounted_rewards = discount(exp.rewards, gamma, reward)
+            discounted_rewards = discount(rewards, gamma, reward)
             value_plus = np.array(values + [reward])
-            advantages = discount(exp.rewards + gamma * value_plus[1:] - value_plus[:-1], gamma)
+            advantages = discount(rewards + gamma * value_plus[1:] - value_plus[:-1], gamma)
 
             # Train network
             v_l, p_l, e_l, g_n, v_n, _ = sess.run([
@@ -145,13 +172,12 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                     model.train
                 ],
                  {
-                    **build_feed_batch(model.inputs, exp.get_states()),
+                    **dict(zip(model.inputs, state_batches)),
                     **
                     {
                         model.target_v: discounted_rewards,
-                        model.actions: exp.actions,
-                        model.advantages: advantages,
-                        K.learning_phase(): 1
+                        model.actions: actions,
+                        model.advantages: advantages
                     }
                 }
             )
@@ -161,7 +187,7 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 writer.add_summary(
                     make_summary({
                         'rewards': total_reward,
-                        'lengths': episode_step_count,
+                        'lengths': step_count,
                         'value_loss': v_l,
                         'policy_loss': p_l,
                         'entropy_loss': e_l,
@@ -175,13 +201,14 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 if episode_count % 10 == 0:
                     writer.flush()
 
-                # Reset per-episode vars
                 episode_count += 1
-                state = preprocess(env.observation_space, env.reset())
+
+                # Reset per-episode counters
                 terminal = False
                 total_reward = 0
-                total_value = 0
-                episode_step_count = 0
+                step_count = 0
+                # Each memory corresponds to one input.
+                memory = Memory(preprocess(ob_space, env.reset()), time_steps)
 
 class A3CCoordinator:
     def __init__(self, state_space, num_actions, model_builder, time_steps=1, model_path='out/model'):
@@ -233,6 +260,9 @@ class A3CCoordinator:
                 t = threading.Thread(target=a3c_worker, args=(sess, coord, writer, env_name, i, model, sync, discount, self.time_steps))
                 t.start()
                 worker_threads.append(t)
+
+                # Stagger threads to decorrelate experience
+                time.sleep(i)
 
             t = threading.Thread(target=save_worker, args=(sess, coord, self))
             t.start()

@@ -37,20 +37,6 @@ def preprocess(space, observation):
         return one_hot(observation, space.n)
     return observation
 
-def build_feed(inputs, state):
-    # Get the feed for each input layer
-    input_feed = zip(*state)
-    return {i: [list(f)] for i, f in zip(inputs, input_feed)}
-
-def build_feed_batch(inputs, states):
-    # Get the feed for each input layer
-    buf = {i: [] for i in inputs}
-    for state in states:
-        input_feed = zip(*state)
-        for i, f in zip(inputs, input_feed):
-            buf[i].append(f)
-    return buf
-
 def make_summary(data, prefix=''):
     if prefix != '':
         prefix += '/'
