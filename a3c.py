@@ -70,7 +70,7 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
     time.sleep(stagger * num)
 
     # Reset per-episode vars
-    state = preprocess(env, env.reset())
+    state = preprocess(env.observation_space, env.reset())
     terminal = False
     total_reward = 0
     episode_step_count = 0
@@ -93,10 +93,10 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 exp.observe(state)
 
                 # Perform action according to policy pi(a_t | s_t)
-                probs, value = sess.run([model.policy, model.value], {
-                    model.inputs: [exp.get_state()],
-                    K.learning_phase(): 0
-                })
+                probs, value = sess.run(
+                    [model.policy, model.value],
+                    build_feed(model.inputs, exp.get_state())
+                )
 
                 # Remove batch dimension
                 probs = probs[0]
@@ -108,10 +108,8 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 values.append(value)
 
                 next_state, reward, terminal, info = env.step(action)
-                next_state = preprocess(env, next_state)
+                next_state = preprocess(env.observation_space, next_state)
 
-                # TODO: Reward clipping? Experiment >2 tasks
-                # r_t = np.clip(r_t, -1, 1)
                 exp.reward(reward)
 
                 total_reward += reward
@@ -123,11 +121,12 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
             if terminal:
                 reward = 0
             else:
+                # TODO: Duplicate calculation
                 # Bootstrap from last state
-                reward = sess.run(model.value, {
-                    model.inputs: [exp.get_state()],
-                    K.learning_phase(): 0
-                })[0][0]
+                reward = sess.run(
+                    model.value,
+                    build_feed(model.inputs, exp.get_state())
+                )[0][0]
 
             # Here we take the rewards and values from the exp, and use them to
             # generate the advantage and discounted returns.
@@ -145,12 +144,15 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                     model.var_norms,
                     model.train
                 ],
-                {
-                    model.target_v: discounted_rewards,
-                    model.inputs: exp.get_states(),
-                    model.actions: exp.actions,
-                    model.advantages: advantages,
-                    K.learning_phase(): 1
+                 {
+                    **build_feed_batch(model.inputs, exp.get_states()),
+                    **
+                    {
+                        model.target_v: discounted_rewards,
+                        model.actions: exp.actions,
+                        model.advantages: advantages,
+                        K.learning_phase(): 1
+                    }
                 }
             )
 
@@ -175,14 +177,15 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
 
                 # Reset per-episode vars
                 episode_count += 1
-                state = preprocess(env, env.reset())
+                state = preprocess(env.observation_space, env.reset())
                 terminal = False
                 total_reward = 0
                 total_value = 0
                 episode_step_count = 0
 
 class A3CCoordinator:
-    def __init__(self, num_actions, model_builder, time_steps=1, model_path='out/model'):
+    def __init__(self, state_space, num_actions, model_builder, time_steps=1, model_path='out/model'):
+        self.state_space = state_space
         self.num_actions = num_actions
         self.model_builder = model_builder
         self.time_steps = time_steps

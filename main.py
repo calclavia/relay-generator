@@ -20,7 +20,7 @@ time_steps = 5
 
 env = gym.make(options.env)
 # Observation space size
-state_shape = space_to_shape(env.observation_space)
+state_space = flatten_space(env.observation_space)
 # Agent action space size
 num_actions = action_to_shape(env.action_space)
 
@@ -34,11 +34,11 @@ for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-model_builder = lambda: dense_1(state_shape, time_steps) # dense(state_shape, units, layers, dropout=0.25)
+model_builder = lambda: rnn_1(state_space, time_steps)
+# dense(state_shape, units, layers, dropout=0.25)
 
 with tf.device("/cpu:0"):
-    # TODO: Output
-    coord = A3CCoordinator(num_actions, model_builder, time_steps=time_steps)
+    coord = A3CCoordinator(state_space, num_actions, model_builder, time_steps=time_steps)
 
     if run:
         coord.run(options.env)

@@ -1,6 +1,7 @@
 import numpy as np
 from util import *
 from collections import deque
+from gym import spaces
 
 class NullExperience:
     """
@@ -66,6 +67,16 @@ class TemporalExperience(Experience):
 
     def observe(self, observation):
         super().observe(observation)
+
+        # Fill temporal memory empty spaces with zeros
+        while len(self.temporal_memory) < self.time_steps - 1:
+            if isinstance(self.observation_space, spaces.Tuple):
+                fill = tuple(np.zeros_like(o) for o in observation)
+            else:
+                fill = np.zeros_like(observation)
+
+            self.temporal_memory.appendleft(fill)
+
         self.temporal_memory.append(observation)
         self.states.append(self.get_state())
 
@@ -73,12 +84,8 @@ class TemporalExperience(Experience):
         super().clear()
 
         self.states = []
-        # Fill in temporal memory
+        # Reset temporal memory
         self.temporal_memory = deque(maxlen=self.time_steps)
-        ob_shape = space_to_shape(self.observation_space)
-
-        for _ in range(self.time_steps - 1):
-            self.temporal_memory.append(np.zeros(ob_shape))
 
     def get_state(self):
         return list(self.temporal_memory)

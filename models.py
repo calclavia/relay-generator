@@ -1,7 +1,8 @@
-from keras.layers import Dense, Input, Dropout
+from keras.layers import Dense, Input, Dropout, merge
 from keras.layers.recurrent import LSTM
 from keras.models import Model
 from keras.regularizers import l2, activity_l2
+from gym import spaces
 
 def rnn(input_shape, time_steps, num_h, layers):
     # Build Network
@@ -36,16 +37,20 @@ def dense(input_shape, num_h, layers, dropout=0, regularization=0):
 
     return inputs, x
 
-def dense_1(input_shape, time_steps):
+def rnn_1(input_space, time_steps):
     # Build Network
-    # Dropout hyper-parameters based on Hinton's paper
-    inputs = x = Input(shape=(time_steps,) + input_shape, name='input')
+
+    # Build multiple inputs. One for each tuple
+    inputs = []
+    for i, space in enumerate(input_space):
+        # One hot vector if it's discrete. Otherwise take the shape of Box.
+        shape = (space.n,) if isinstance(space, spaces.Discrete) else space.shape
+        inputs.append(Input(shape=(time_steps,) + shape, name='input' + str(i)))
+
+    x = merge(inputs, mode='concat', concat_axis=2)
     x = LSTM(128, activation='relu', name='lstm')(x)
-#    x = Dropout(0.1)(x)
-    x = Dense(256, activation='relu', name='hidden1')(x)
-#    x = Dropout(0.1)(x)
-    x = Dense(512, activation='relu', name='hidden2')(x)
-#    x = Dropout(0.25)(x)
+    x = Dense(128, activation='relu', name='hidden1')(x)
+    x = Dense(256, activation='relu', name='hidden2')(x)
     x = Dense(512, activation='relu', name='hidden3')(x)
-#    x = Dropout(0.25)(x)
+    #x = Dense(512, activation='relu', name='hidden4')(x)
     return inputs, x

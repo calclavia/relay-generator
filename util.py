@@ -4,16 +4,8 @@ import numpy as np
 import tensorflow as tf
 from gym import spaces
 
-def space_to_shape(space):
-    if isinstance(space, spaces.Discrete):
-        # One hot vectors of states
-        return (space.n,)
-
-    if isinstance(space, spaces.Tuple):
-        return (len(space.spaces),)
-
-    return space.shape
-
+def flatten_space(s):
+    return flatten_space(s.spaces) if isinstance(s, spaces.Tuple) else s
 
 def action_to_shape(space):
     return space.n if isinstance(space, spaces.Discrete) else space.shape
@@ -33,15 +25,31 @@ def discount(rewards, discount, current=0):
 
     return discounted_r
 
-
-def preprocess(env, observation):
+def preprocess(space, observation):
     """
     Preprocesses the input observation before recording it into experience
     """
-    if isinstance(env.observation_space, spaces.Discrete):
-        return one_hot(observation, env.observation_space.n)
+    if isinstance(space, spaces.Tuple):
+        # Each input corresponds to one input layer
+        return tuple(preprocess(s, o) for s, o in zip(space.spaces, observation))
+
+    if isinstance(space, spaces.Discrete):
+        return one_hot(observation, space.n)
     return observation
 
+def build_feed(inputs, state):
+    # Get the feed for each input layer
+    input_feed = zip(*state)
+    return {i: [list(f)] for i, f in zip(inputs, input_feed)}
+
+def build_feed_batch(inputs, states):
+    # Get the feed for each input layer
+    buf = {i: [] for i in inputs}
+    for state in states:
+        input_feed = zip(*state)
+        for i, f in zip(inputs, input_feed):
+            buf[i].append(f)
+    return buf
 
 def make_summary(data, prefix=''):
     if prefix != '':
@@ -57,7 +65,6 @@ def make_summary(data, prefix=''):
 def save_worker(sess, coord, agent):
     while not coord.should_stop():
         time.sleep(30)
-        print('Saving model...')
         agent.save(sess)
 
 def update_target_graph(from_scope, to_scope):

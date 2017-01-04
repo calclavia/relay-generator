@@ -79,8 +79,8 @@ class RelayEnv(gym.Env):
         return self.build_observation()
 
     def build_observation(self):
-        blocks = np.array(self.world.blocks.flatten(), dtype='float')
-        return np.concatenate((blocks, np.array(self.pos), [self.difficulty]))
+        blocks = tuple(self.world.blocks.flatten())
+        return blocks + self.pos + ([self.difficulty],)
 
     def _render(self, mode='human', close=False):
         pass
