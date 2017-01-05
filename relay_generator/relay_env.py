@@ -38,24 +38,28 @@ class RelayEnv(gym.Env):
         if not self.world.in_bounds(self.pos):
             # We went out of the map
             done = True
-            #reward -= self.size
+            reward -= 1
         elif self.pos in self.visited:
             # We went back to a previous position
             done = True
-            #reward -= self.size
+            reward -= 1
         elif self.world.blocks[self.pos] == BlockType.start.value:
             # We've came back!
             done = True
             reward += self.size
             # Additional rewards
-            reward += self.size / (self.difficulty - self.turns + 1)
+            # reward += 1 / (self.difficulty - self.turns + 1)
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
             if direction != self.prev_dir:
                 self.turns += 1
                 self.prev_dir = direction
-            reward += 1
+
+                if self.difficulty <= self.turns:
+                    reward += 1
+                else:
+                    reward -= 1
 
         self.visited.append(self.pos)
         self.actions += 1

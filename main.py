@@ -16,7 +16,7 @@ parser.add_option("-l", "--layers",  help="Number of layers")
 run = True if options.run is not None else False
 units = int(options.size) if options.size is not None else 128
 layers = int(options.layers) if options.layers is not None else 5
-time_steps = 10
+time_steps = 8
 
 env = gym.make(options.env)
 # Observation space size

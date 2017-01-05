@@ -48,9 +48,7 @@ def rnn_1(input_space, time_steps):
         inputs.append(Input(shape=(time_steps,) + shape, name='input' + str(i)))
 
     x = merge(inputs, mode='concat', concat_axis=2)
-    x = LSTM(128, activation='relu', name='lstm')(x)
-    x = Dense(128, activation='relu', name='hidden1')(x)
-    x = Dense(256, activation='relu', name='hidden2')(x)
-    x = Dense(512, activation='relu', name='hidden3')(x)
-    #x = Dense(512, activation='relu', name='hidden4')(x)
+    x = LSTM(512, activation='relu', name='lstm')(x)
+    x = Dense(512, activation='relu', name='hidden1')(x)
+    x = Dense(512, activation='relu', name='hidden2')(x)
     return inputs, x
