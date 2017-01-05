@@ -31,7 +31,7 @@ class RelayEnv(gym.Env):
 
         done = False
         reward = 0
-        
+
         if not self.world.in_bounds(self.pos):
             # We went out of the map
             done = True
@@ -47,6 +47,8 @@ class RelayEnv(gym.Env):
             reward += self.size
             # Additional rewards
             # reward += 1 / (self.difficulty - self.turns + 1)
+            # TODO: Remove this
+            print(self.world.blocks)
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value

@@ -9,6 +9,7 @@ import relay_generator
 parser = OptionParser()
 parser.add_option("-e", "--env",  help="Gym Environment")
 parser.add_option("-r", "--run",  help="Run only?")
+parser.add_option("-m", "--model",  help="Path to save model")
 parser.add_option("-s", "--size",  help="Number of hidden units")
 parser.add_option("-l", "--layers",  help="Number of layers")
 (options, args) = parser.parse_args()
@@ -27,7 +28,7 @@ num_actions = action_to_shape(env.action_space)
 # Directories
 output_path = './out'
 summary_path = output_path + '/summary'
-model_path = output_path + '/model'
+model_path = str(options.model) if options.model is not None else output_path + '/model'
 
 # Make directories for outputs
 for path in [summary_path, model_path]:
@@ -38,7 +39,13 @@ model_builder = lambda: relay_dense(state_space)
 # dense(state_shape, units, layers, dropout=0.25)
 
 with tf.device("/cpu:0"):
-    coord = A3CCoordinator(state_space, num_actions, model_builder, time_steps=time_steps)
+    coord = A3CCoordinator(
+        state_space,
+        num_actions,
+        model_builder,
+        time_steps=time_steps,
+        model_path=model_path
+    )
 
     if run:
         coord.run(options.env)
