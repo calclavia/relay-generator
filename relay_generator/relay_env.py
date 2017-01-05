@@ -7,9 +7,6 @@ from .problem import *
 from .search import *
 from .util import *
 
-num_block_type = 3
-num_directions = 4
-
 class RelayEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
@@ -34,13 +31,14 @@ class RelayEnv(gym.Env):
 
         done = False
         reward = 0
-
+        
         if not self.world.in_bounds(self.pos):
             # We went out of the map
             done = True
             reward -= self.size
-        elif self.pos in self.visited:
-            # We went back to a previous position
+        elif self.pos == self.prev_pos or\
+             self.world.blocks[self.pos] == BlockType.empty.value:
+            # We went back to a previous/solid position
             done = True
             reward -= self.size
         elif self.world.blocks[self.pos] == BlockType.start.value:
@@ -61,30 +59,29 @@ class RelayEnv(gym.Env):
                 else:
                     reward -= 1
 
-        self.visited.append(self.pos)
-        self.actions += 1
+        self.prev_pos = self.pos
         return self.build_observation(), reward, done, {}
 
     def _reset(self):
-        # Number of actions performed
-        self.actions = 0
         # Number of turns made
         self.turns = 0
+        # The last direction made
         self.prev_dir = None
-        self.visited = []
 
         self.world = World(self.dim)
         # Generate random starting position
         # TODO: Turn this into numpy int array?
-        self.pos = (np.random.randint(self.dim[0]), np.random.randint(self.dim[1]))
+        self.prev_pos = self.pos = (
+            np.random.randint(self.dim[0]),
+            np.random.randint(self.dim[1])
+        )
         self.world.blocks[self.pos] = BlockType.start.value
         # Generate random difficulty
         self.difficulty = np.random.uniform(4, 10)
-        self.visited.append(self.pos)
         return self.build_observation()
 
     def build_observation(self):
-        return (self.world.blocks, np.array(self.pos), [self.difficulty])
+        return (self.world.blocks, np.array(self.pos), np.array([self.difficulty]))
 
     def _render(self, mode='human', close=False):
         pass

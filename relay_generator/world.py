@@ -1,6 +1,8 @@
 import numpy as np
 from enum import Enum
 
+from .util import *
+
 class World:
     """
     Represents the starting state of a generated world.
@@ -35,8 +37,3 @@ class World:
                 i += 1
 
         return i
-
-class BlockType(Enum):
-    empty = 1
-    solid = 2
-    start = 3

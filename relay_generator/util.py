@@ -1,6 +1,7 @@
 import heapq
 from enum import Enum
 
+num_directions = 4
 
 class Direction(Enum):
     right = (0, (1, 0))
@@ -14,6 +15,22 @@ DirectionMap = {
     2: Direction.up,
     3: Direction.down,
 }
+
+# Movement directions.
+num_move_dirs = 3
+
+class MoveDirection(Enum):
+    left = 0
+    forward = 1
+    right = 2
+
+# Types of blocks available
+num_block_type = 3
+
+class BlockType(Enum):
+    empty = 0
+    solid = 1
+    start = 2
 
 class PriorityQueue:
     """

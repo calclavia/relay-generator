@@ -66,7 +66,7 @@ class Memory:
         # TODO: Handle non-tuple inputs?
         for input_state in init_state:
             # lookback buffer
-            temporal_memory = deque(maxlen=min(time_steps, 0))
+            temporal_memory = deque(maxlen=max(time_steps, 1))
             # Fill temporal memory with zeros
             while len(temporal_memory) < time_steps - 1:
                 temporal_memory.appendleft(np.zeros_like(input_state))
@@ -138,7 +138,7 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 action = np.random.choice(len(probs), p=probs)
 
                 next_state, reward, terminal, info = env.step(action)
-                next_state = preprocess(env.observation_space, next_state)
+                next_state = preprocess(env, next_state)
 
                 # Bookkeeping
                 for i, state in enumerate(memory.to_states()):
@@ -220,7 +220,7 @@ class A3CCoordinator:
                  num_actions,
                  model_builder,
                  time_steps=0,
-                 preprocess=lambda e, x: x
+                 preprocess=lambda e, x: x,
                  model_path='out/model'):
         self.state_space = state_space
         self.num_actions = num_actions

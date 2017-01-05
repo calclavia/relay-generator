@@ -20,15 +20,22 @@ def relay_dense(input_space):
     num_block_types = int((map_space.high - map_space.low).max())
 
     # Define inputs
-    block_input = Input(shape=(map_space.shape[0], map_space.shape[1], num_block_types))
-    pos_input = Input(shape=pos_shape.shape)
-    difficulty_input = Input(shape=difficulty_shape.shape)
+    block_input = Input(
+        shape=(
+            map_space.shape[0],
+            map_space.shape[1],
+            num_block_types
+        ),
+        name='block_input'
+    )
+    pos_input = Input(shape=pos_shape.shape, name='pos_input')
+    difficulty_input = Input(shape=difficulty_shape.shape, name='difficulty_input')
 
     # Build image processing
     # TODO: Should we add dropout, Max pooling?
-    image = Convolution2D(32, 3, 3)(block_input)
+    image = Convolution2D(32, 3, 3, name='conv1')(block_input)
     image = Activation('relu')(image)
-    image = Convolution2D(64, 3, 3)(image)
+    image = Convolution2D(64, 3, 3, name='conv2')(image)
     image = Activation('relu')(image)
     image = Flatten()(image)
 
@@ -40,12 +47,13 @@ def relay_dense(input_space):
 
     # TODO: LSTM with stateful=True?
     x = merge([image, feature], mode='concat')
+    x = Dense(512, name='h1')(x)
     x = Dense(512, name='h2')(x)
     x = Activation('relu')(x)
     return [block_input, pos_input, difficulty_input], x
 
 """
-def preprocess(space, observation):
+def preprocess(env, observation):
     ""
     Preprocesses the input observation before recording it into experience
     ""
@@ -58,16 +66,15 @@ def preprocess(space, observation):
     return observation
 """
 
-def preprocess(space, observation):
+def preprocess(env, observation):
     """
     Preprocesses the relay space
     """
     # TODO: Could be optimized?
-    map_space, pos_shape, difficulty_shape = space.spaces
+    map_space, pos_shape, difficulty_shape = env.observation_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
 
     map_state, pos_state, difficulty_state = observation
-
     # Turn map_state into a one-hot channel bit image
-    map_state = (np.arange(num_block_types) == map_state[:,:,None] - 1).astype(int)
+    map_state = (np.arange(num_block_types) == map_state[:,:,None] - 1)
     return (map_state, pos_state, difficulty_state)
