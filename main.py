@@ -16,11 +16,11 @@ parser.add_option("-l", "--layers",  help="Number of layers")
 run = True if options.run is not None else False
 units = int(options.size) if options.size is not None else 128
 layers = int(options.layers) if options.layers is not None else 5
-time_steps = 8
+time_steps = 0
 
 env = gym.make(options.env)
 # Observation space size
-state_space = flatten_space(env.observation_space)
+state_space = env.observation_space
 # Agent action space size
 num_actions = action_to_shape(env.action_space)
 
@@ -34,7 +34,7 @@ for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-model_builder = lambda: rnn_1(state_space, time_steps)
+model_builder = lambda: relay_dense(state_space)
 # dense(state_shape, units, layers, dropout=0.25)
 
 with tf.device("/cpu:0"):

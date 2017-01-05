@@ -62,10 +62,11 @@ class AC_Network():
 class Memory:
     def __init__(self, init_state, time_steps):
         self._memory = []
+        self.time_steps = time_steps
         # TODO: Handle non-tuple inputs?
         for input_state in init_state:
             # lookback buffer
-            temporal_memory = deque(maxlen=time_steps)
+            temporal_memory = deque(maxlen=min(time_steps, 0))
             # Fill temporal memory with zeros
             while len(temporal_memory) < time_steps - 1:
                 temporal_memory.appendleft(np.zeros_like(input_state))
@@ -79,16 +80,23 @@ class Memory:
 
     def to_states(self):
         """ Returns a state per input """
-        return [list(m) for m in self._memory]
+        if self.time_steps == 0:
+            # No time_steps = not recurrent
+            return [m[0] for m in self._memory]
+        else:
+            return [list(m) for m in self._memory]
 
     def build_single_feed(self, inputs):
-        return { i: [list(m)] for i, m in zip(inputs, self._memory) }
+        if self.time_steps == 0:
+            # No time_steps = not recurrent
+            return { i: list(m) for i, m in zip(inputs, self._memory) }
+        else:
+            return { i: [list(m)] for i, m in zip(inputs, self._memory) }
 
 def a3c_worker(sess, coord, writer, env_name, num, model, sync,
-               gamma, time_steps, max_buffer=32):
+               gamma, time_steps, preprocess, max_buffer=32):
     # Thread setup
     env = gym.make(env_name)
-    ob_space = env.observation_space
 
     episode_count = 0
 
@@ -97,7 +105,7 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
     total_reward = 0
     step_count = 0
     # Each memory corresponds to one input.
-    memory = Memory(preprocess(ob_space, env.reset()), time_steps)
+    memory = Memory(preprocess(env, env.reset()), time_steps)
 
     print("Running worker " + str(num))
 
@@ -197,9 +205,6 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                     episode_count
                 )
 
-                if episode_count % 10 == 0:
-                    writer.flush()
-
                 episode_count += 1
 
                 # Reset per-episode counters
@@ -207,10 +212,16 @@ def a3c_worker(sess, coord, writer, env_name, num, model, sync,
                 total_reward = 0
                 step_count = 0
                 # Each memory corresponds to one input.
-                memory = Memory(preprocess(ob_space, env.reset()), time_steps)
+                memory = Memory(preprocess(env, env.reset()), time_steps)
 
 class A3CCoordinator:
-    def __init__(self, state_space, num_actions, model_builder, time_steps=1, model_path='out/model'):
+    def __init__(self,
+                 state_space,
+                 num_actions,
+                 model_builder,
+                 time_steps=0,
+                 preprocess=lambda e, x: x
+                 model_path='out/model'):
         self.state_space = state_space
         self.num_actions = num_actions
         self.model_builder = model_builder
@@ -219,7 +230,7 @@ class A3CCoordinator:
         # Generate global network
         self.model = AC_Network(model_builder, num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
-
+        self.preprocess = preprocess
         print(self.model.model.summary())
 
     def load(self, sess):
@@ -255,8 +266,19 @@ class A3CCoordinator:
             worker_threads = []
 
             for i, (name, model, sync) in enumerate(workers):
-                writer = tf.summary.FileWriter(summary_path + name, sess.graph)
-                t = threading.Thread(target=a3c_worker, args=(sess, coord, writer, env_name, i, model, sync, discount, self.time_steps))
+                writer = tf.summary.FileWriter(summary_path + name, sess.graph, flush_secs=2)
+                t = threading.Thread(target=a3c_worker, args=(
+                    sess,
+                    coord,
+                    writer,
+                    env_name,
+                    i,
+                    model,
+                    sync,
+                    discount,
+                    self.time_steps,
+                    preprocess
+                ))
                 t.start()
                 worker_threads.append(t)
 

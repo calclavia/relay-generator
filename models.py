@@ -1,45 +1,12 @@
-from keras.layers import Dense, Input, Dropout, merge
+import numpy as np
+from keras.layers import Dense, Input, Dropout, merge, Activation, Flatten
 from keras.layers.recurrent import LSTM
+from keras.layers.convolutional import Convolution2D
 from keras.models import Model
 from keras.regularizers import l2, activity_l2
 from gym import spaces
 
-def rnn(input_shape, time_steps, num_h, layers):
-    # Build Network
-    # Dropout hyper-parameters based on Hinton's paper
-    inputs = x = Input(shape=(time_steps,) + input_shape, name='input')
-    x = Dropout(0.2)(x)
-    x = LSTM(num_h, activation='relu', name='hidden')(x)
-    x = Dropout(0.5)(x)
-
-    for i in range(layers - 1):
-        x = Dense(num_h, activation='relu', name='hidden' + str(i))(x)
-        x = Dropout(0.5)(x)
-
-    return Model(inputs, x)
-
-def dense(input_shape, num_h, layers, dropout=0, regularization=0):
-    # Build Network
-    inputs = x = Input(shape=input_shape, name='input')
-    if dropout != 0:
-        x = Dropout(dropout)(x)
-
-    for i in range(layers):
-        x = Dense(num_h,
-                  activation='relu',
-                  name='hidden' + str(i),
-                  W_regularizer=l2(regularization),
-                  activity_regularizer=activity_l2(regularization)
-        )(x)
-
-        if dropout != 0:
-            x = Dropout(dropout)(x)
-
-    return inputs, x
-
-def rnn_1(input_space, time_steps):
-    # Build Network
-
+def build_inputs(input_shape, time_steps):
     # Build multiple inputs. One for each tuple
     inputs = []
     for i, space in enumerate(input_space):
@@ -47,8 +14,60 @@ def rnn_1(input_space, time_steps):
         shape = (space.n,) if isinstance(space, spaces.Discrete) else space.shape
         inputs.append(Input(shape=(time_steps,) + shape, name='input' + str(i)))
 
-    x = merge(inputs, mode='concat', concat_axis=2)
-    x = LSTM(512, activation='relu', name='lstm')(x)
-    x = Dense(512, activation='relu', name='hidden1')(x)
-    x = Dense(512, activation='relu', name='hidden2')(x)
-    return inputs, x
+def relay_dense(input_space):
+    # Build Network
+    map_space, pos_shape, difficulty_shape = input_space.spaces
+    num_block_types = int((map_space.high - map_space.low).max())
+
+    # Define inputs
+    block_input = Input(shape=(map_space.shape[0], map_space.shape[1], num_block_types))
+    pos_input = Input(shape=pos_shape.shape)
+    difficulty_input = Input(shape=difficulty_shape.shape)
+
+    # Build image processing
+    # TODO: Should we add dropout, Max pooling?
+    image = Convolution2D(32, 3, 3)(block_input)
+    image = Activation('relu')(image)
+    image = Convolution2D(64, 3, 3)(image)
+    image = Activation('relu')(image)
+    image = Flatten()(image)
+
+    # Build feature processing
+    feature = merge([pos_input, difficulty_input], mode='concat', concat_axis=1)
+    # TODO: Do adding these layers help?
+    #feature = Dense(32, name='h1')(feature)
+    #feature = Activation('relu')(feature)
+
+    # TODO: LSTM with stateful=True?
+    x = merge([image, feature], mode='concat')
+    x = Dense(512, name='h2')(x)
+    x = Activation('relu')(x)
+    return [block_input, pos_input, difficulty_input], x
+
+"""
+def preprocess(space, observation):
+    ""
+    Preprocesses the input observation before recording it into experience
+    ""
+    if isinstance(space, spaces.Tuple):
+        # Each input corresponds to one input layer
+        return tuple(preprocess(s, o) for s, o in zip(space.spaces, observation))
+
+    if isinstance(space, spaces.Discrete):
+        return one_hot(observation, space.n)
+    return observation
+"""
+
+def preprocess(space, observation):
+    """
+    Preprocesses the relay space
+    """
+    # TODO: Could be optimized?
+    map_space, pos_shape, difficulty_shape = space.spaces
+    num_block_types = int((map_space.high - map_space.low).max())
+
+    map_state, pos_state, difficulty_state = observation
+
+    # Turn map_state into a one-hot channel bit image
+    map_state = (np.arange(num_block_types) == map_state[:,:,None] - 1).astype(int)
+    return (map_state, pos_state, difficulty_state)

@@ -18,11 +18,11 @@ class RelayEnv(gym.Env):
         self.size = dim[0] * dim[1]
 
         # Observe the world
-        self.observation_space = spaces.Tuple(
-            tuple(spaces.Discrete(num_block_type) for _ in range(self.size)) +
-            (spaces.Discrete(dim[0]), spaces.Discrete(dim[1])) +
-            (spaces.Box(4, 10, shape=(1)),)
-        )
+        self.observation_space = spaces.Tuple((
+            spaces.Box(0, num_block_type, shape=dim),
+            spaces.Box(np.array([0, 0]), np.array(dim)),
+            spaces.Box(4, 10, shape=(1))
+        ))
 
         # Actions allow the world to be populated.
         self.action_space = spaces.Discrete(num_directions)
@@ -75,6 +75,7 @@ class RelayEnv(gym.Env):
 
         self.world = World(self.dim)
         # Generate random starting position
+        # TODO: Turn this into numpy int array?
         self.pos = (np.random.randint(self.dim[0]), np.random.randint(self.dim[1]))
         self.world.blocks[self.pos] = BlockType.start.value
         # Generate random difficulty
@@ -83,8 +84,7 @@ class RelayEnv(gym.Env):
         return self.build_observation()
 
     def build_observation(self):
-        blocks = tuple(self.world.blocks.flatten())
-        return blocks + self.pos + ([self.difficulty],)
+        return (self.world.blocks, np.array(self.pos), [self.difficulty])
 
     def _render(self, mode='human', close=False):
         pass

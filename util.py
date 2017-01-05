@@ -25,18 +25,6 @@ def discount(rewards, discount, current=0):
 
     return discounted_r
 
-def preprocess(space, observation):
-    """
-    Preprocesses the input observation before recording it into experience
-    """
-    if isinstance(space, spaces.Tuple):
-        # Each input corresponds to one input layer
-        return tuple(preprocess(s, o) for s, o in zip(space.spaces, observation))
-
-    if isinstance(space, spaces.Discrete):
-        return one_hot(observation, space.n)
-    return observation
-
 def make_summary(data, prefix=''):
     if prefix != '':
         prefix += '/'
