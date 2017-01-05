@@ -38,11 +38,11 @@ class RelayEnv(gym.Env):
         if not self.world.in_bounds(self.pos):
             # We went out of the map
             done = True
-            reward -= 1
+            reward -= self.size
         elif self.pos in self.visited:
             # We went back to a previous position
             done = True
-            reward -= 1
+            reward -= self.size
         elif self.world.blocks[self.pos] == BlockType.start.value:
             # We've came back!
             done = True
