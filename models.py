@@ -45,15 +45,14 @@ def relay_dense(input_space):
 
     # Build feature processing
     feature = merge([pos_input, difficulty_input], mode='concat', concat_axis=1)
-    # TODO: Do adding these layers help?
-    #feature = Dense(32, name='h1')(feature)
-    #feature = Activation('relu')(feature)
 
-    # TODO: LSTM with stateful=True?
+    # Merge all features
     x = merge([image, feature], mode='concat')
     x = Dense(512, name='h1')(x)
+    x = Activation('relu')(x)
     x = Dense(512, name='h2')(x)
     x = Activation('relu')(x)
+
     return [block_input, pos_input, difficulty_input], x
 
 """

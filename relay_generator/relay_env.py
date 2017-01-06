@@ -36,7 +36,7 @@ class RelayEnv(gym.Env):
             # We went out of the map
             done = True
             #reward -= self.size
-        elif self.pos == self.prev_pos or\
+        elif (self.pos[0] == self.prev_pos[0] and self.pos[1] == self.prev_pos[1]) or\
              self.world.blocks[self.pos] == BlockType.empty.value:
             # We went back to a previous/solid position
             done = True
