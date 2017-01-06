@@ -112,6 +112,7 @@ class A3CAgent:
         self.saver = tf.train.Saver(max_to_keep=5)
         self.preprocess = preprocess
         self.batch_size = batch_size
+        self.save_count = 0
         print(self.model.model.summary())
 
     def load(self, sess):
@@ -119,7 +120,8 @@ class A3CAgent:
         self.saver.restore(sess, ckpt.model_checkpoint_path)
 
     def save(self, sess):
-        self.saver.save(sess, self.model_path + '/model.cptk')
+        self.saver.save(sess, self.model_path + '/model-' + str(self.save_count) + '.cptk')
+        self.save_count += 1
 
     def train(self,
               env_name,
@@ -141,11 +143,11 @@ class A3CAgent:
                 workers.append((name, model, sync))
 
             # Initialize variables
+            sess.run(tf.global_variables_initializer())
             try:
                 self.load(sess)
                 print('Loading last saved session')
             except:
-                sess.run(tf.global_variables_initializer())
                 print('Starting new session')
 
             coord = tf.train.Coordinator()

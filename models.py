@@ -32,15 +32,15 @@ def relay_dense(input_space):
     difficulty_input = Input(shape=difficulty_shape.shape, name='difficulty_input')
 
     # Build image processing
-    # TODO: Should we add dropout, Max pooling?
     image = block_input
-    for i in range(2):
-        image = Convolution2D(32, 3, 3, name='conv1_'+ str(i))(image)
-        image = Activation('relu')(image)
-
-    for i in range(3):
-        image = Convolution2D(64, 2, 2, name='conv2_'+ str(i))(image)
-        image = Activation('relu')(image)
+    image = Convolution2D(64, 3, 3, name='conv1')(image)
+    image = Activation('relu')(image)
+    image = Convolution2D(64, 3, 3, name='conv2')(image)
+    image = Activation('relu')(image)
+    image = Convolution2D(128, 3, 3, name='conv3')(image)
+    image = Activation('relu')(image)
+    image = Convolution2D(256, 3, 3, name='conv4')(image)
+    image = Activation('relu')(image)
 
     image = Flatten()(image)
 
@@ -51,7 +51,7 @@ def relay_dense(input_space):
     x = merge([image, feature], mode='concat')
 
     for i in range(4):
-        x = Dense(1024, name='h' + str(i))(x)
+        x = Dense(512, name='h' + str(i))(x)
         x = Activation('relu')(x)
 
     return [block_input, pos_input, difficulty_input], x

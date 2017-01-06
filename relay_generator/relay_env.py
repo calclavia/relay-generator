@@ -47,6 +47,24 @@ class RelayEnv(gym.Env):
             # We've came back!
             done = True
             reward += 1
+
+            # Award for clustering
+            average_cluster = 0
+            num_empty_blocks = 0
+
+            for index, block_val in np.ndenumerate(self.world.blocks):
+                if block_val == BlockType.empty.value:
+                    num_empty_blocks += 1
+
+                    for d in DirectionMap.values():
+                        ddx, ddy = d.value[1]
+                        neighbor_pos = (index[0] + ddx, index[1] + ddy)
+                        if self.world.in_bounds(neighbor_pos) and\
+                           self.world.blocks[neighbor_pos] == BlockType.empty.value:
+                            average_cluster += 1
+
+            average_cluster /= num_empty_blocks
+            reward += average_cluster - 1
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
@@ -55,17 +73,6 @@ class RelayEnv(gym.Env):
                 self.prev_dir = direction
                 # Reward for turning based on difficulty
                 reward += (1 if self.difficulty <= self.turns else -1) / (self.max_turns)
-
-            # Reward for creating cluster of blocks
-            # TODO: Would this discourage the goal?
-            for d in DirectionMap.values():
-                # All sides except for back, and reward if another empty block
-                if d != DirectionMap[direction.value[0] ^ 1]:
-                    ddx, ddy = d.value[1]
-                    neighbor_pos = (self.pos[0] + ddx, self.pos[1] + ddy)
-                    if self.world.in_bounds(neighbor_pos) and\
-                       self.world.blocks[neighbor_pos] == BlockType.empty.value:
-                        reward += 1 / (3 * self.size)
 
         self.actions += 1
         return self.build_observation(), reward, done, {}
