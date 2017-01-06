@@ -13,6 +13,7 @@ class RelayEnv(gym.Env):
     def __init__(self, dim=(9, 9)):
         self.dim = dim
         self.size = dim[0] * dim[1]
+        self.max_turns = 10
 
         # Observe the world
         self.observation_space = spaces.Tuple((
@@ -53,7 +54,7 @@ class RelayEnv(gym.Env):
             if direction != self.prev_dir:
                 self.turns += 1
                 self.prev_dir = direction
-                reward += (1 if self.difficulty <= self.turns else -1) / self.size
+                reward += (1 if self.difficulty <= self.turns else -1) / self.max_turns
 
         self.actions += 1
         return self.build_observation(), reward, done, {}
@@ -74,7 +75,7 @@ class RelayEnv(gym.Env):
         )
         self.world.blocks[self.pos] = BlockType.start.value
         # Generate random difficulty
-        self.difficulty = np.random.uniform(4, 10)
+        self.difficulty = np.random.uniform(4, self.max_turns)
         return self.build_observation()
 
     def build_observation(self):

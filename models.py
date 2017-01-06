@@ -33,18 +33,15 @@ def relay_dense(input_space):
 
     # Build image processing
     # TODO: Should we add dropout, Max pooling?
-    image = Convolution2D(32, 3, 3, name='conv1')(block_input)
-    image = Activation('relu')(image)
-    #image = Dropout(0.2)(image)
-    image = Convolution2D(32, 3, 3, name='conv2')(image)
-    image = Activation('relu')(image)
-    #image = Dropout(0.2)(image)
-    image = Convolution2D(64, 3, 3, name='conv3')(image)
-    image = Activation('relu')(image)
-    #image = Dropout(0.25)(image)
-    image = Convolution2D(64, 3, 3, name='conv4')(image)
-    image = Activation('relu')(image)
-    #image = Dropout(0.25)(image)
+    image = block_input
+    for i in range(3):
+        image = Convolution2D(32, 3, 3, name='conv1_'+ str(i))(image)
+        image = Activation('relu')(image)
+
+    for i in range(3):
+        image = Convolution2D(64, 3, 3, name='conv2_'+ str(i))(image)
+        image = Activation('relu')(image)
+
     image = Flatten()(image)
 
     # Build feature processing
@@ -53,7 +50,7 @@ def relay_dense(input_space):
     # Merge all features
     x = merge([image, feature], mode='concat')
 
-    for i in range(3):
+    for i in range(4):
         x = Dense(512, name='h' + str(i))(x)
         x = Activation('relu')(x)
         # x = Dropout(0.25)(x)

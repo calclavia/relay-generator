@@ -14,7 +14,7 @@ from keras.models import Model
 from models import *
 from util import *
 
-class AC_Network():
+class ACModel():
     def __init__(self, model_builder, num_actions, scope, beta=1e-2):
         self.scope = scope
         self.num_actions = num_actions
@@ -63,7 +63,7 @@ class Memory:
     def __init__(self, init_state, time_steps):
         self._memory = []
         self.time_steps = time_steps
-        # TODO: Handle non-tuple inputs?
+
         for input_state in init_state:
             # lookback buffer
             temporal_memory = deque(maxlen=max(time_steps, 1))
@@ -108,7 +108,7 @@ class A3CAgent:
         self.time_steps = time_steps
         self.model_path = model_path
         # Generate global network
-        self.model = AC_Network(model_builder, num_actions, 'global')
+        self.model = ACModel(model_builder, num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
         self.preprocess = preprocess
         self.batch_size = batch_size
@@ -135,7 +135,7 @@ class A3CAgent:
             # Create worker classes
             for i in range(num_workers):
                 name = 'worker_' + str(i)
-                model = AC_Network(self.model_builder, self.num_actions, name)
+                model = ACModel(self.model_builder, self.num_actions, name)
                 model.compile(optimizer)
                 sync = update_target_graph('global', name)
                 workers.append((name, model, sync))
@@ -308,7 +308,7 @@ class A3CAgent:
             self.load(sess)
             env = gym.make(env_name)
 
-            memory = Memory(preprocess(env, env.reset()), self.time_steps)
+            memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
             total_reward = 0
             terminal = False
 
@@ -333,6 +333,6 @@ class A3CAgent:
                 print('Action', action)
                 print('Reward', reward)
                 total_reward += reward
-                memory.remember(preprocess(env, state))
+                memory.remember(self.preprocess(env, state))
 
             print('Total Reward:', total_reward)
