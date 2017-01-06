@@ -40,7 +40,6 @@ model_builder = lambda: relay_dense(state_space)
 
 with tf.device("/cpu:0"):
     coord = A3CAgent(
-        state_space,
         num_actions,
         model_builder,
         time_steps=time_steps,

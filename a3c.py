@@ -23,7 +23,7 @@ class ACModel():
 
         with tf.variable_scope(self.scope):
             self.inputs, x = model_builder()
-            #Output layers for policy and value estimations
+            # Output layers for policy and value estimations
             self.policy = Dense(num_actions, activation='softmax', name='policy_output')(x)
             self.value = Dense(1, activation='linear', name='value_output')(x)
             self.model = Model(self.inputs, [self.policy, self.value])
@@ -95,14 +95,12 @@ class Memory:
 
 class A3CAgent:
     def __init__(self,
-                 state_space,
                  num_actions,
                  model_builder,
                  time_steps=0,
                  preprocess=lambda e, x: x,
                  model_path='out/model',
                  batch_size=32):
-        self.state_space = state_space
         self.num_actions = num_actions
         self.model_builder = model_builder
         self.time_steps = time_steps

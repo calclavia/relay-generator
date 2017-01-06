@@ -5,6 +5,7 @@ Automatic level generation trained using reinforcement learning. Uses A3C algori
 - Python 3.5
 - Keras
 - Gym
+- Tensorflow
 
 ```
 pip3 install keras
