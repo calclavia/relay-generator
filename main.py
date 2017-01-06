@@ -15,9 +15,6 @@ parser.add_option("-l", "--layers",  help="Number of layers")
 (options, args) = parser.parse_args()
 
 run = True if options.run is not None else False
-units = int(options.size) if options.size is not None else 128
-layers = int(options.layers) if options.layers is not None else 5
-time_steps = 0
 
 env = gym.make(options.env)
 # Observation space size
@@ -35,19 +32,15 @@ for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-model_builder = lambda: relay_dense(state_space)
-# dense(state_shape, units, layers, dropout=0.25)
-
 with tf.device("/cpu:0"):
-    coord = A3CAgent(
+    agent = A3CAgent(
         num_actions,
-        model_builder,
-        time_steps=time_steps,
+        lambda: relay_dense(state_space),
         model_path=model_path,
         preprocess=relay_preprocess
     )
 
     if run:
-        coord.run(options.env)
+        agent.run(env)
     else:
-        coord.train(options.env)
+        agent.train(options.env)

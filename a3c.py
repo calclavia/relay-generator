@@ -302,37 +302,32 @@ class A3CAgent:
                     # Each memory corresponds to one input.
                     memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
 
-    def run(self, env_name):
+    def run(self, env):
         print('Running')
         with tf.Session() as sess:
             self.load(sess)
-            env = gym.make(env_name)
+            self.run_sess(sess, env)
 
-            memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
-            total_reward = 0
-            terminal = False
+    def run_sess(self, sess, env):
+        memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
+        total_reward = 0
+        terminal = False
 
-            while not terminal:
-                # Perform action according to policy pi(a_t | s_t)
-                probs, value = sess.run(
-                    [self.model.policy, self.model.value],
-                    {
-                        ** memory.build_single_feed(self.model.inputs),
-                        ** { K.learning_phase(): 0 }
-                    }
-                )
+        while not terminal:
+            # Perform action according to policy pi(a_t | s_t)
+            probs, value = sess.run(
+                [self.model.policy, self.model.value],
+                {
+                    ** memory.build_single_feed(self.model.inputs),
+                    ** { K.learning_phase(): 0 }
+                }
+            )
 
-                # Remove batch dimension
-                probs = probs[0]
-                value = value[0]
-                # Sample an action from an action probability distribution output
-                action = np.random.choice(len(probs), p=probs)
-                state, reward, terminal, info = env.step(action)
-                # TODO: Don't hardcode this
-                print('State', state)
-                print('Action', action)
-                print('Reward', reward)
-                total_reward += reward
-                memory.remember(self.preprocess(env, state))
-
-            print('Total Reward:', total_reward)
+            # Remove batch dimension
+            probs = probs[0]
+            value = value[0]
+            # Sample an action from an action probability distribution output
+            action = np.random.choice(len(probs), p=probs)
+            state, reward, terminal, info = env.step(action)
+            total_reward += reward
+            memory.remember(self.preprocess(env, state))

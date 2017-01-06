@@ -67,7 +67,7 @@ class RelayEnv(gym.Env):
             reward += average_cluster - 1
 
             # Reward for turning based on difficulty
-            reward += 1 / (self.difficulty - self.turns + 1)
+            reward += 1 / (abs(self.difficulty - self.turns) + 1)
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
