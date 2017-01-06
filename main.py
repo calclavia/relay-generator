@@ -39,12 +39,13 @@ model_builder = lambda: relay_dense(state_space)
 # dense(state_shape, units, layers, dropout=0.25)
 
 with tf.device("/cpu:0"):
-    coord = A3CCoordinator(
+    coord = A3CAgent(
         state_space,
         num_actions,
         model_builder,
         time_steps=time_steps,
-        model_path=model_path
+        model_path=model_path,
+        preprocess=relay_preprocess
     )
 
     if run:

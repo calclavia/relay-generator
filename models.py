@@ -74,7 +74,7 @@ def preprocess(env, observation):
     return observation
 """
 
-def preprocess(env, observation):
+def relay_preprocess(env, observation):
     """
     Preprocesses the relay space
     """

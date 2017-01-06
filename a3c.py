@@ -93,142 +93,15 @@ class Memory:
         else:
             return { i: [list(m)] for i, m in zip(inputs, self._memory) }
 
-def a3c_worker(sess, coord, writer, env_name, num, model, sync,
-               gamma, time_steps, preprocess, max_buffer=32):
-    # Thread setup
-    env = gym.make(env_name)
-
-    episode_count = 0
-
-    # Reset per-episode vars
-    terminal = False
-    total_reward = 0
-    step_count = 0
-    # Each memory corresponds to one input.
-    memory = Memory(preprocess(env, env.reset()), time_steps)
-
-    print("Running worker " + str(num))
-
-    with sess.as_default(), sess.graph.as_default():
-        while not coord.should_stop():
-            # Sync local network with global network
-            sess.run(sync)
-
-            # Run a training batch
-            t = 0
-            t_start = t
-
-            # Batched based variables
-            state_batches = [[] for _ in model.inputs]
-            actions = []
-            rewards = []
-            values = []
-
-            while not (terminal or ((t - t_start) == max_buffer)):
-                # Perform action according to policy pi(a_t | s_t)
-                probs, value = sess.run(
-                    [model.policy, model.value],
-                    {
-                        ** memory.build_single_feed(model.inputs),
-                        ** { K.learning_phase(): 0 }
-                    }
-                )
-
-                # Remove batch dimension
-                probs = probs[0]
-                value = value[0]
-                # Sample an action from an action probability distribution output
-                action = np.random.choice(len(probs), p=probs)
-
-                next_state, reward, terminal, info = env.step(action)
-                next_state = preprocess(env, next_state)
-
-                # Bookkeeping
-                for i, state in enumerate(memory.to_states()):
-                    state_batches[i].append(state)
-
-                memory.remember(next_state)
-                actions.append(action)
-                values.append(value)
-                rewards.append(reward)
-
-                total_reward += reward
-                step_count += 1
-                t += 1
-
-            if terminal:
-                reward = 0
-            else:
-                # Bootstrap from last state
-                reward = sess.run(
-                    model.value,
-                    {
-                        ** memory.build_single_feed(model.inputs),
-                        ** { K.learning_phase(): 0 }
-                    }
-                )[0][0]
-
-            # Here we take the rewards and values from the exp, and use them to
-            # generate the advantage and discounted returns.
-            # The advantage function uses "Generalized Advantage Estimation"
-            discounted_rewards = discount(rewards, gamma, reward)
-            value_plus = np.array(values + [reward])
-            advantages = discount(rewards + gamma * value_plus[1:] - value_plus[:-1], gamma)
-
-            # Train network
-            v_l, p_l, e_l, g_n, v_n, _ = sess.run([
-                    model.value_loss,
-                    model.policy_loss,
-                    model.entropy,
-                    model.grad_norms,
-                    model.var_norms,
-                    model.train
-                ],
-                 {
-                    **dict(zip(model.inputs, state_batches)),
-                    **
-                    {
-                        model.target_v: discounted_rewards,
-                        model.actions: actions,
-                        model.advantages: advantages,
-                        K.learning_phase(): 1
-                    }
-                }
-            )
-
-            if terminal:
-                # Record metrics
-                writer.add_summary(
-                    make_summary({
-                        'rewards': total_reward,
-                        'lengths': step_count,
-                        'value_loss': v_l,
-                        'policy_loss': p_l,
-                        'entropy_loss': e_l,
-                        'grad_norm': g_n,
-                        'value_norm': v_n,
-                        'mean_values': np.mean(values)
-                    }),
-                    episode_count
-                )
-
-                episode_count += 1
-
-                # Reset per-episode counters
-                terminal = False
-                total_reward = 0
-                step_count = 0
-                # Each memory corresponds to one input.
-                memory = Memory(preprocess(env, env.reset()), time_steps)
-
-class A3CCoordinator:
+class A3CAgent:
     def __init__(self,
                  state_space,
                  num_actions,
                  model_builder,
                  time_steps=0,
                  preprocess=lambda e, x: x,
-                 model_path='out/model'):
+                 model_path='out/model',
+                 batch_size=32):
         self.state_space = state_space
         self.num_actions = num_actions
         self.model_builder = model_builder
@@ -238,6 +111,7 @@ class A3CCoordinator:
         self.model = AC_Network(model_builder, num_actions, 'global')
         self.saver = tf.train.Saver(max_to_keep=5)
         self.preprocess = preprocess
+        self.batch_size = batch_size
         print(self.model.model.summary())
 
     def load(self, sess):
@@ -279,7 +153,7 @@ class A3CCoordinator:
 
             for i, (name, model, sync) in enumerate(workers):
                 writer = tf.summary.FileWriter(summary_path + name, sess.graph, flush_secs=2)
-                t = threading.Thread(target=a3c_worker, args=(
+                t = threading.Thread(target=self.train_thread, args=(
                     sess,
                     coord,
                     writer,
@@ -287,9 +161,7 @@ class A3CCoordinator:
                     i,
                     model,
                     sync,
-                    discount,
-                    self.time_steps,
-                    preprocess
+                    discount
                 ))
                 t.start()
                 worker_threads.append(t)
@@ -302,6 +174,133 @@ class A3CCoordinator:
             worker_threads.append(t)
 
             coord.join(worker_threads)
+
+    def train_thread(self, sess, coord, writer, env_name, num, model, sync, gamma):
+        # Thread setup
+        env = gym.make(env_name)
+
+        episode_count = 0
+
+        # Reset per-episode vars
+        terminal = False
+        total_reward = 0
+        step_count = 0
+        # Each memory corresponds to one input.
+        memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
+
+        print("Running worker " + str(num))
+
+        with sess.as_default(), sess.graph.as_default():
+            while not coord.should_stop():
+                # Sync local network with global network
+                sess.run(sync)
+
+                # Run a training batch
+                t = 0
+                t_start = t
+
+                # Batched based variables
+                state_batches = [[] for _ in model.inputs]
+                actions = []
+                rewards = []
+                values = []
+
+                while not (terminal or ((t - t_start) == self.batch_size)):
+                    # Perform action according to policy pi(a_t | s_t)
+                    probs, value = sess.run(
+                        [model.policy, model.value],
+                        {
+                            ** memory.build_single_feed(model.inputs),
+                            ** { K.learning_phase(): 0 }
+                        }
+                    )
+
+                    # Remove batch dimension
+                    probs = probs[0]
+                    value = value[0]
+                    # Sample an action from an action probability distribution output
+                    action = np.random.choice(len(probs), p=probs)
+
+                    next_state, reward, terminal, info = env.step(action)
+                    next_state = self.preprocess(env, next_state)
+
+                    # Bookkeeping
+                    for i, state in enumerate(memory.to_states()):
+                        state_batches[i].append(state)
+
+                    memory.remember(next_state)
+                    actions.append(action)
+                    values.append(value)
+                    rewards.append(reward)
+
+                    total_reward += reward
+                    step_count += 1
+                    t += 1
+
+                if terminal:
+                    reward = 0
+                else:
+                    # Bootstrap from last state
+                    reward = sess.run(
+                        model.value,
+                        {
+                            ** memory.build_single_feed(model.inputs),
+                            ** { K.learning_phase(): 0 }
+                        }
+                    )[0][0]
+
+                # Here we take the rewards and values from the exp, and use them to
+                # generate the advantage and discounted returns.
+                # The advantage function uses "Generalized Advantage Estimation"
+                discounted_rewards = discount(rewards, gamma, reward)
+                value_plus = np.array(values + [reward])
+                advantages = discount(rewards + gamma * value_plus[1:] - value_plus[:-1], gamma)
+
+                # Train network
+                v_l, p_l, e_l, g_n, v_n, _ = sess.run([
+                        model.value_loss,
+                        model.policy_loss,
+                        model.entropy,
+                        model.grad_norms,
+                        model.var_norms,
+                        model.train
+                    ],
+                     {
+                        **dict(zip(model.inputs, state_batches)),
+                        **
+                        {
+                            model.target_v: discounted_rewards,
+                            model.actions: actions,
+                            model.advantages: advantages,
+                            K.learning_phase(): 1
+                        }
+                    }
+                )
+
+                if terminal:
+                    # Record metrics
+                    writer.add_summary(
+                        make_summary({
+                            'rewards': total_reward,
+                            'lengths': step_count,
+                            'value_loss': v_l,
+                            'policy_loss': p_l,
+                            'entropy_loss': e_l,
+                            'grad_norm': g_n,
+                            'value_norm': v_n,
+                            'mean_values': np.mean(values)
+                        }),
+                        episode_count
+                    )
+
+                    episode_count += 1
+
+                    # Reset per-episode counters
+                    terminal = False
+                    total_reward = 0
+                    step_count = 0
+                    # Each memory corresponds to one input.
+                    memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
 
     def run(self, env_name):
         print('Running')
