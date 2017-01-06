@@ -35,12 +35,12 @@ class RelayEnv(gym.Env):
         if not self.world.in_bounds(self.pos):
             # We went out of the map
             done = True
-            reward -= self.size
+            #reward -= self.size
         elif self.pos == self.prev_pos or\
              self.world.blocks[self.pos] == BlockType.empty.value:
             # We went back to a previous/solid position
             done = True
-            reward -= self.size
+            #reward -= self.size
         elif self.world.blocks[self.pos] == BlockType.start.value:
             # We've came back!
             done = True
@@ -48,7 +48,7 @@ class RelayEnv(gym.Env):
             # Additional rewards
             # reward += 1 / (self.difficulty - self.turns + 1)
             # TODO: Remove this
-            print(self.world.blocks)
+            # print(self.world.blocks)
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
@@ -60,6 +60,8 @@ class RelayEnv(gym.Env):
                     reward += 1
                 else:
                     reward -= 1
+            # TODO: Rewarding for this causes artificially long paths
+            reward += 1
 
         self.prev_pos = self.pos
         return self.build_observation(), reward, done, {}

@@ -35,7 +35,11 @@ def relay_dense(input_space):
     # TODO: Should we add dropout, Max pooling?
     image = Convolution2D(32, 3, 3, name='conv1')(block_input)
     image = Activation('relu')(image)
-    image = Convolution2D(64, 3, 3, name='conv2')(image)
+    image = Convolution2D(32, 3, 3, name='conv2')(image)
+    image = Activation('relu')(image)
+    image = Convolution2D(64, 3, 3, name='conv3')(image)
+    image = Activation('relu')(image)
+    image = Convolution2D(64, 3, 3, name='conv4')(image)
     image = Activation('relu')(image)
     image = Flatten()(image)
 

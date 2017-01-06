@@ -260,7 +260,12 @@ class A3CCoordinator:
                 workers.append((name, model, sync))
 
             # Initialize variables
-            sess.run(tf.global_variables_initializer())
+            try:
+                self.load(sess)
+                print('Loading last saved session')
+            except:
+                sess.run(tf.global_variables_initializer())
+                print('Starting new session')
 
             coord = tf.train.Coordinator()
             worker_threads = []
@@ -297,7 +302,7 @@ class A3CCoordinator:
             self.load(sess)
             env = gym.make(env_name)
 
-            memory = Memory(preprocess(env.observation_space, env.reset()), self.time_steps)
+            memory = Memory(preprocess(env, env.reset()), self.time_steps)
             total_reward = 0
             terminal = False
 
@@ -315,10 +320,10 @@ class A3CCoordinator:
                 action = np.random.choice(len(probs), p=probs)
                 state, reward, terminal, info = env.step(action)
                 # TODO: Don't hardcode this
-                print('State', np.array(list(state)[:-3]).reshape(9,9))
+                print('State', state)
                 print('Action', action)
                 print('Reward', reward)
                 total_reward += reward
-                memory.remember(preprocess(env.observation_space, state))
+                memory.remember(preprocess(env, state))
 
             print('Total Reward:', total_reward)
