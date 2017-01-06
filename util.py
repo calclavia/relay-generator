@@ -4,17 +4,6 @@ import numpy as np
 import tensorflow as tf
 from gym import spaces
 
-def flatten_space(s):
-    return flatten_space(s.spaces) if isinstance(s, spaces.Tuple) else s
-
-def action_to_shape(space):
-    return space.n if isinstance(space, spaces.Discrete) else space.shape
-
-
-def one_hot(index, size):
-    return [1 if index == i else 0 for i in range(size)]
-
-
 def discount(rewards, discount, current=0):
     """ Takes an array of rewards and compute array of discounted reward """
     discounted_r = np.zeros_like(rewards)
@@ -35,10 +24,9 @@ def make_summary(data, prefix=''):
 
     return summary
 
-
 def save_worker(sess, coord, agent):
     while not coord.should_stop():
-        time.sleep(30)
+        time.sleep(60)
         agent.save(sess)
 
 def update_target_graph(from_scope, to_scope):
@@ -53,3 +41,24 @@ def update_target_graph(from_scope, to_scope):
     for from_var, to_var in zip(from_vars, to_vars):
         op_holder.append(to_var.assign(from_var))
     return op_holder
+
+def track(env):
+    """
+    Wraps a Gym environment to keep track of the results of step calls visited.
+    """
+    step = env.step
+    def step_override(*args, **kwargs):
+        result = step(*args, **kwargs)
+        env.step_cache.append(result)
+        env.total_reward += result[1]
+        return result
+    env.step = step_override
+
+    reset = env.reset
+    def reset_override(*args, **kwargs):
+        env.total_reward = 0
+        env.step_cache = []
+        return reset(*args, **kwargs)
+    env.reset = reset_override
+
+    return env

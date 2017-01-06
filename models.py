@@ -1,18 +1,9 @@
 import numpy as np
-from keras.layers import Dense, Input, Dropout, merge, Activation, Flatten
+from keras.layers import Dense, Input, merge, Activation, Flatten
 from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution2D
 from keras.models import Model
 from keras.regularizers import l2, activity_l2
-from gym import spaces
-
-def build_inputs(input_shape, time_steps):
-    # Build multiple inputs. One for each tuple
-    inputs = []
-    for i, space in enumerate(input_space):
-        # One hot vector if it's discrete. Otherwise take the shape of Box.
-        shape = (space.n,) if isinstance(space, spaces.Discrete) else space.shape
-        inputs.append(Input(shape=(time_steps,) + shape, name='input' + str(i)))
 
 def relay_dense(input_space):
     # Build Network
@@ -55,20 +46,6 @@ def relay_dense(input_space):
         x = Activation('relu')(x)
 
     return [block_input, pos_input, difficulty_input], x
-
-"""
-def preprocess(env, observation):
-    ""
-    Preprocesses the input observation before recording it into experience
-    ""
-    if isinstance(space, spaces.Tuple):
-        # Each input corresponds to one input layer
-        return tuple(preprocess(s, o) for s, o in zip(space.spaces, observation))
-
-    if isinstance(space, spaces.Discrete):
-        return one_hot(observation, space.n)
-    return observation
-"""
 
 def relay_preprocess(env, observation):
     """

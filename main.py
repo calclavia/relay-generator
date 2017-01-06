@@ -1,3 +1,6 @@
+"""
+Runner file used to train the neural network.
+"""
 import tensorflow as tf
 import gym
 
@@ -17,10 +20,6 @@ parser.add_option("-l", "--layers",  help="Number of layers")
 run = True if options.run is not None else False
 
 env = gym.make(options.env)
-# Observation space size
-state_space = env.observation_space
-# Agent action space size
-num_actions = action_to_shape(env.action_space)
 
 # Directories
 output_path = './out'
@@ -34,8 +33,8 @@ for path in [summary_path, model_path]:
 
 with tf.device("/cpu:0"):
     agent = A3CAgent(
-        num_actions,
-        lambda: relay_dense(state_space),
+        env.action_space.n,
+        lambda: relay_dense( env.observation_space),
         model_path=model_path,
         preprocess=relay_preprocess
     )

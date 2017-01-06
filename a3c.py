@@ -60,6 +60,8 @@ class ACModel():
             self.train = optimizer.apply_gradients(zip(grads, global_vars))
 
 class Memory:
+    """
+    """
     def __init__(self, init_state, time_steps):
         self._memory = []
         self.time_steps = time_steps

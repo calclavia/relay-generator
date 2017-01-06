@@ -6,7 +6,9 @@ import gym
 from flask import Flask, jsonify
 
 import relay_generator
-from a3c import *
+from a3c import A3CAgent
+from util import track
+from models import *
 
 app = Flask(__name__)
 
@@ -14,41 +16,17 @@ app = Flask(__name__)
 env_name = 'relay-generator-v0'
 env = gym.make(env_name)
 
-# Agent action space size
-num_actions = action_to_shape(env.action_space)
-
 # Global cache
 sess = tf.Session()
 
 with tf.device("/cpu:0"):
     agent = A3CAgent(
-        num_actions,
-         lambda: relay_dense(env.observation_space),
+        env.action_space.n,
+        lambda: relay_dense(env.observation_space),
         preprocess=relay_preprocess
     )
 
     agent.load(sess)
-
-def track(env):
-    """
-    Wraps a Gym environment to keep track of the results of step calls visited.
-    """
-    step = env.step
-    def step_override(*args, **kwargs):
-        result = step(*args, **kwargs)
-        env.step_cache.append(result)
-        env.total_reward += result[1]
-        return result
-    env.step = step_override
-
-    reset = env.reset
-    def reset_override(*args, **kwargs):
-        env.total_reward = 0
-        env.step_cache = []
-        return reset(*args, **kwargs)
-    env.reset = reset_override
-
-    return env
 
 @app.route('/')
 def generate():
