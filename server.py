@@ -31,7 +31,12 @@ with tf.device("/cpu:0"):
 @app.route('/')
 def generate():
     env = track(gym.make(env_name))
-    agent.run_sess(sess, env)
+    # Keep generating until we have a valid map
+    total_reward = 0
+    while total_reward < 1:
+        agent.run_sess(sess, env)
+        total_reward = env.total_reward
+
     final_state = env.step_cache[-1][0][0].tolist()
     results = {
         'blocks': final_state,
