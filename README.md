@@ -1,16 +1,28 @@
 # Relay Level Generator
-Automatic level generation trained using reinforcement learning. Uses A3C algorithm, OpenAI Gym, Keras and Tensorflow.
+Automatic level generation trained using reinforcement learning.
+Uses A3C algorithm, OpenAI Gym, Keras and Tensorflow.
 
-## Requirements
-- Python 3.5
-- Keras
-- Gym
-- Tensorflow
+See `requirements.txt` for dependencies
 
+## Running using Virtualenv
+Install Virtualenv
 ```
-pip3 install keras
-pip3 install gym[all]
+sudo pip install virtualenv
 ```
+
+Create an isolated Python environment, and install dependencies:
+```
+virtualenv env
+source env/bin/activate
+pip install -r requirements.txt
+```
+
+Run server
+```
+python server.py
+```
+
+You can visit the server via `http://localhost:5000`
 
 ## References
 - https://github.com/openai/gym/tree/master/gym/envs
