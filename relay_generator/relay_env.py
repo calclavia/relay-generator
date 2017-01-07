@@ -32,19 +32,20 @@ class RelayEnv(gym.Env):
         # Apply action
         direction = DirectionMap[action]
         dx, dy = direction.value[1]
+        prev = self.pos
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
         done = False
         reward = 0
 
         if not self.world.in_bounds(self.pos):
-            # We went out of the map
+            # We went out of the map. Revert.
             done = True
-            reward -= 2
+            reward -= 5
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position
             done = True
-            reward -= 1
+            reward -= 4
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
@@ -78,7 +79,7 @@ class RelayEnv(gym.Env):
                         cluster += 1
                     num_neighbors += 1
 
-            reward += cluster / (num_neighbors * self.size * 0.05)
+            reward += cluster / (num_neighbors * self.size * 0.02) * self.difficulty
             self.blocks_in_dir += 1
 
         return self.build_observation(), reward, done, {}

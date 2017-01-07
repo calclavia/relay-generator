@@ -28,7 +28,7 @@ class ACModel():
             self.value = Dense(1, activation='linear', name='value_output')(x)
             self.model = Model(self.inputs, [self.policy, self.value])
 
-    def compile(self, optimizer):
+    def compile(self, optimizer, grad_clip):
         # Only the worker network need ops for loss functions and gradient updating.
         with tf.variable_scope(self.scope):
             self.actions = tf.placeholder(shape=[None], dtype=tf.int32)
@@ -52,7 +52,7 @@ class ACModel():
             self.gradients = tf.gradients(self.loss, local_vars)
             self.var_norms = tf.global_norm(local_vars)
             # Clip norm of gradients
-            grads, self.grad_norms = tf.clip_by_global_norm(self.gradients, 40.0)
+            grads, self.grad_norms = tf.clip_by_global_norm(self.gradients, grad_clip)
 
             # Apply local gradients to global network
             global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
@@ -126,10 +126,11 @@ class A3CAgent:
 
     def train(self,
               env_name,
+              grad_clip=50.,
               discount=.99,
               summary_path='out/summary/',
               num_workers=multiprocessing.cpu_count(),
-              optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)):
+              optimizer=tf.train.AdamOptimizer(learning_rate=1e-3)):
         print('Training')
 
         with tf.Session() as sess:
@@ -144,7 +145,7 @@ class A3CAgent:
                     name,
                     self.entropy_factor
                 )
-                model.compile(optimizer)
+                model.compile(optimizer, grad_clip)
                 sync = update_target_graph('global', name)
                 workers.append((name, model, sync))
 

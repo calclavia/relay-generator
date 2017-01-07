@@ -16,7 +16,7 @@ app = Flask(__name__)
 env_name = 'relay-generator-v0'
 env = gym.make(env_name)
 
-acceptance = 4
+acceptance = 2
 
 # Global cache
 sess = tf.Session()
@@ -48,9 +48,14 @@ def generate():
 
     # Keep generating until we have a valid map
     total_reward = 0
-    while total_reward < acceptance:
+    i = 0
+    while total_reward < acceptance and i < 100:
         agent.run_sess(sess, env)
         total_reward = env.total_reward
+        i += 1
+
+    if total_reward < acceptance:
+        raise 'Unable to generate valid solution'
 
     final_state = env.step_cache[-1][0][0].tolist()
     print(env.step_cache[-1][0][0])
