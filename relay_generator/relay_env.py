@@ -14,9 +14,9 @@ class RelayEnv(gym.Env):
     def __init__(self, dim=(9, 9)):
         self.dim = dim
         self.size = dim[0] * dim[1]
-        self.max_difficulty = 100
         self.max_blocks_per_turn = max(*dim)
         self.target_difficulty = None
+        self.target_pos = None
 
         # Observe the world
         self.observation_space = spaces.Tuple((
@@ -63,6 +63,7 @@ class RelayEnv(gym.Env):
 
             # Award for keeping block in direction
             r = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
+            reward += r / (self.target_blocks_per_turn * self.target_turns)
 
             # Award for clustering non-solid blocks together
             num_neighbors = 0
@@ -77,8 +78,7 @@ class RelayEnv(gym.Env):
                         cluster += 1
                     num_neighbors += 1
 
-            r *= cluster / num_neighbors
-            reward += r / (self.target_blocks_per_turn * self.target_turns)
+            reward += cluster / (num_neighbors * self.size * 0.05)
             self.blocks_in_dir += 1
 
         return self.build_observation(), reward, done, {}
@@ -93,12 +93,12 @@ class RelayEnv(gym.Env):
 
         # Generate random difficulty
         if self.target_difficulty is None:
-            self.difficulty = np.random.uniform(4, self.max_difficulty)
+            self.difficulty = np.random.uniform(0, 1)
         else:
             self.difficulty = self.target_difficulty
 
-        self.target_turns = round(log(0.5 * self.difficulty + 1, 1.4) + 1)
-        self.target_blocks_per_turn = round(1 / (0.005 * self.difficulty + 0.2 - 0.01 * self.max_blocks_per_turn) + 1)
+        self.target_turns = round(log(50 * self.difficulty + 1, 1.4) + 1)
+        self.target_blocks_per_turn = round(1 / (0.5 * self.difficulty + 0.2 - 0.01 * self.max_blocks_per_turn) + 1)
 
         self.world = World(self.dim)
 

@@ -16,7 +16,7 @@ app = Flask(__name__)
 env_name = 'relay-generator-v0'
 env = gym.make(env_name)
 
-acceptance = 2
+acceptance = 4
 
 # Global cache
 sess = tf.Session()
@@ -35,6 +35,7 @@ def generate():
     env = track(gym.make(env_name))
     # Parse arguments
     difficulty = float(request.args.get('difficulty'))
+
     if request.args.get('pos_x') and request.args.get('pos_y'):
         px = int(request.args.get('pos_x'))
         py = int(request.args.get('pos_y'))
