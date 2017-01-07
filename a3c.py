@@ -114,7 +114,6 @@ class A3CAgent:
         # Generate global network
         self.model = ACModel(model_builder, num_actions, 'global', entropy_factor)
         self.saver = tf.train.Saver(max_to_keep=5)
-        print(self.model.model.summary())
 
     def load(self, sess):
         ckpt = tf.train.get_checkpoint_state(self.model_path)
@@ -131,7 +130,8 @@ class A3CAgent:
               summary_path='out/summary/',
               num_workers=multiprocessing.cpu_count(),
               optimizer=tf.train.AdamOptimizer(learning_rate=1e-3)):
-        print('Training')
+        print('Training model')
+        print(self.model.model.summary())
 
         with tf.Session() as sess:
             workers = []
