@@ -25,7 +25,8 @@ with tf.device("/cpu:0"):
     agent = A3CAgent(
         env.action_space.n,
         lambda: relay_dense(env.observation_space),
-        preprocess=relay_preprocess
+        preprocess=relay_preprocess,
+        model_path='model'
     )
 
 agent.load(sess)
