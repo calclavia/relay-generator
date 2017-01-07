@@ -1,5 +1,8 @@
-entrypoint: python server.py
+entrypoint: gunicorn -b :$PORT server:app
 env: flex
 runtime: python
 runtime_config:
   python_version: 3
+
+automatic_scaling:
+  min_num_instances: 1
