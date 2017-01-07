@@ -10,16 +10,14 @@ from optparse import OptionParser
 import relay_generator
 
 parser = OptionParser()
-parser.add_option("-e", "--env",  help="Gym Environment")
 parser.add_option("-r", "--run",  help="Run only?")
 parser.add_option("-m", "--model",  help="Path to save model")
-parser.add_option("-s", "--size",  help="Number of hidden units")
-parser.add_option("-l", "--layers",  help="Number of layers")
 (options, args) = parser.parse_args()
 
 run = True if options.run is not None else False
 
-env = gym.make(options.env)
+env_name = 'relay-generator-v0'
+env = gym.make(env_name)
 
 # Directories
 output_path = './out'
@@ -42,4 +40,4 @@ with tf.device("/cpu:0"):
     if run:
         agent.run(env)
     else:
-        agent.train(options.env)
+        agent.train(env_name)

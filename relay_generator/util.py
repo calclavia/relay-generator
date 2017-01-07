@@ -25,12 +25,13 @@ class MoveDirection(Enum):
     right = 2
 
 # Types of blocks available
-num_block_type = 3
+num_block_type = 4
 
 class BlockType(Enum):
     empty = 0
     solid = 1
     start = 2
+    end = 3
 
 class PriorityQueue:
     """

@@ -15,7 +15,7 @@ from models import *
 from util import *
 
 class ACModel():
-    def __init__(self, model_builder, num_actions, scope, beta=1e-2):
+    def __init__(self, model_builder, num_actions, scope, beta):
         self.scope = scope
         self.num_actions = num_actions
         # Entropy weight
@@ -41,11 +41,10 @@ class ACModel():
              # Value loss (Mean squared error)
             self.value_loss = tf.reduce_mean(tf.square(self.target_v - tf.reshape(self.value, [-1])))
             # Entropy regularization
-            self.entropy = -tf.reduce_sum(self.policy * tf.log(self.policy + 1e-9))
+            self.entropy = -tf.reduce_sum(self.policy * tf.log(tf.clip_by_value(self.policy, 1e-20, 1.0)))
             # Policy loss
             self.policy_loss = -tf.reduce_sum(tf.log(responsible_outputs) * self.advantages)
             # Learning rate for Critic is half of Actor's, so multiply by 0.5
-            # TODO: In very sprase rewards, entropy loss causes NAN..., even when BETA = 0
             self.loss = 0.5 * self.value_loss + self.policy_loss - self.beta * self.entropy
 
             # Get gradients from local network using local losses
@@ -102,17 +101,19 @@ class A3CAgent:
                  time_steps=0,
                  preprocess=lambda e, x: x,
                  model_path='out/model',
+                 entropy_factor=1e-2,
                  batch_size=32):
         self.num_actions = num_actions
         self.model_builder = model_builder
         self.time_steps = time_steps
         self.model_path = model_path
-        # Generate global network
-        self.model = ACModel(model_builder, num_actions, 'global')
-        self.saver = tf.train.Saver(max_to_keep=5)
+        self.entropy_factor = entropy_factor
         self.preprocess = preprocess
         self.batch_size = batch_size
         self.save_count = 0
+        # Generate global network
+        self.model = ACModel(model_builder, num_actions, 'global', entropy_factor)
+        self.saver = tf.train.Saver(max_to_keep=5)
         print(self.model.model.summary())
 
     def load(self, sess):
@@ -137,7 +138,12 @@ class A3CAgent:
             # Create worker classes
             for i in range(num_workers):
                 name = 'worker_' + str(i)
-                model = ACModel(self.model_builder, self.num_actions, name)
+                model = ACModel(
+                    self.model_builder,
+                    self.num_actions,
+                    name,
+                    self.entropy_factor
+                )
                 model.compile(optimizer)
                 sync = update_target_graph('global', name)
                 workers.append((name, model, sync))

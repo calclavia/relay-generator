@@ -26,14 +26,14 @@ with tf.device("/cpu:0"):
         preprocess=relay_preprocess
     )
 
-    agent.load(sess)
+agent.load(sess)
 
 @app.route('/')
 def generate():
     env = track(gym.make(env_name))
     # Keep generating until we have a valid map
     total_reward = 0
-    while total_reward < 1:
+    while total_reward < 0:
         agent.run_sess(sess, env)
         total_reward = env.total_reward
 
