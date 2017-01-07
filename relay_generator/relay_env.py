@@ -61,28 +61,25 @@ class RelayEnv(gym.Env):
                 self.turns += 1
                 self.prev_dir = direction
 
-            m = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
-            reward += m / (self.target_blocks_per_turn * self.target_turns)
+            # Award for keeping block in direction
+            r = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
+
+            # Award for clustering non-solid blocks together
+            num_neighbors = 0
+            # There must be an adjacent block. Don't count that one.
+            cluster = -1
+
+            for d in DirectionMap.values():
+                ddx, ddy = d.value[1]
+                neighbor_pos = (self.pos[0] + ddx, self.pos[1] + ddy)
+                if self.world.in_bounds(neighbor_pos):
+                    if self.world.blocks[neighbor_pos] != BlockType.solid.value:
+                        cluster += 1
+                    num_neighbors += 1
+
+            r *= cluster / num_neighbors
+            reward += r / (self.target_blocks_per_turn * self.target_turns)
             self.blocks_in_dir += 1
-            """
-                # Award for clustering
-                average_cluster = 0
-                num_empty_blocks = 0
-
-                for index, block_val in np.ndenumerate(self.world.blocks):
-                    if block_val == BlockType.empty.value:
-                        num_empty_blocks += 1
-
-                        for d in DirectionMap.values():
-                            ddx, ddy = d.value[1]
-                            neighbor_pos = (index[0] + ddx, index[1] + ddy)
-                            if self.world.in_bounds(neighbor_pos) and\
-                               self.world.blocks[neighbor_pos] == BlockType.empty.value:
-                                average_cluster += 1
-
-                average_cluster /= num_empty_blocks
-                reward += average_cluster - 1
-            """
 
         return self.build_observation(), reward, done, {}
 
@@ -104,12 +101,16 @@ class RelayEnv(gym.Env):
         self.target_blocks_per_turn = round(1 / (0.005 * self.difficulty + 0.2 - 0.01 * self.max_blocks_per_turn) + 1)
 
         self.world = World(self.dim)
-        # Generate random starting position
-        # TODO: Turn this into numpy int array?
-        self.prev_pos = self.pos = (
-            np.random.randint(self.dim[0]),
-            np.random.randint(self.dim[1])
-        )
+
+        if self.target_pos is None:
+            # Generate random starting position
+            self.pos = (
+                np.random.randint(self.dim[0]),
+                np.random.randint(self.dim[1])
+            )
+        else:
+            self.pos = self.target_pos
+
         self.world.blocks[self.pos] = BlockType.start.value
         return self.build_observation()
 

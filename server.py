@@ -33,9 +33,18 @@ agent.load(sess)
 @app.route('/')
 def generate():
     env = track(gym.make(env_name))
-    difficulty = request.args.get('difficulty', type='float')
-    pos = (request.args.get('pos_x', type='int'), request.args.get('pos_y', type='int'))
-    print(difficulty, pos)
+    # Parse arguments
+    difficulty = float(request.args.get('difficulty'))
+    if request.args.get('pos_x') and request.args.get('pos_y'):
+        px = int(request.args.get('pos_x'))
+        py = int(request.args.get('pos_y'))
+        pos = (px, py)
+    else:
+        pos = None
+
+    env.target_difficulty = difficulty
+    env.target_pos = pos
+
     # Keep generating until we have a valid map
     total_reward = 0
     while total_reward < acceptance:
@@ -45,7 +54,10 @@ def generate():
     final_state = env.step_cache[-1][0][0].tolist()
     print(env.step_cache[-1][0][0])
     results = {
-        'blocks': final_state,
-        'rewards': env.total_reward
+        'rewards': env.total_reward,
+        'difficulty': env.difficulty,
+        'turns': env.target_turns,
+        'blocks_per_turn': env.target_blocks_per_turn,
+        'blocks': final_state
     }
     return jsonify(results)
