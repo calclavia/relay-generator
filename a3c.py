@@ -218,10 +218,7 @@ class A3CAgent:
                     # Perform action according to policy pi(a_t | s_t)
                     probs, value = sess.run(
                         [model.policy, model.value],
-                        {
-                            ** memory.build_single_feed(model.inputs),
-                            ** { K.learning_phase(): 0 }
-                        }
+                         memory.build_single_feed(model.inputs)
                     )
 
                     # Remove batch dimension
@@ -252,10 +249,7 @@ class A3CAgent:
                     # Bootstrap from last state
                     reward = sess.run(
                         model.value,
-                        {
-                            ** memory.build_single_feed(model.inputs),
-                            ** { K.learning_phase(): 0 }
-                        }
+                        memory.build_single_feed(model.inputs)
                     )[0][0]
 
                 # Here we take the rewards and values from the exp, and use them to
@@ -280,8 +274,7 @@ class A3CAgent:
                         {
                             model.target_v: discounted_rewards,
                             model.actions: actions,
-                            model.advantages: advantages,
-                            K.learning_phase(): 1
+                            model.advantages: advantages
                         }
                     }
                 )
@@ -326,10 +319,7 @@ class A3CAgent:
             # Perform action according to policy pi(a_t | s_t)
             probs, value = sess.run(
                 [self.model.policy, self.model.value],
-                {
-                    ** memory.build_single_feed(self.model.inputs),
-                    ** { K.learning_phase(): 0 }
-                }
+                memory.build_single_feed(self.model.inputs)
             )
 
             # Remove batch dimension

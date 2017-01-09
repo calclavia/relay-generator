@@ -4,6 +4,7 @@ Relay level generation server
 import tensorflow as tf
 import gym
 from flask import Flask, jsonify, request
+from flask_cors import CORS, cross_origin
 
 import relay_generator
 from a3c import A3CAgent
@@ -11,6 +12,7 @@ from util import track
 from models import *
 
 app = Flask(__name__)
+CORS(app)
 
 # Create relay environment
 env_name = 'relay-generator-v0'

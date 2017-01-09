@@ -3,3 +3,4 @@ keras
 gym
 flask
 gunicorn
+flask-cors
