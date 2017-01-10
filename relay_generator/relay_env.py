@@ -8,10 +8,11 @@ from .problem import *
 from .search import *
 from .util import *
 
+
 class RelayEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, dim=(9, 9)):
+    def __init__(self, dim=(9, 16)):
         self.dim = dim
         self.size = dim[0] * dim[1]
         self.max_blocks_per_turn = max(*dim)
@@ -36,16 +37,19 @@ class RelayEnv(gym.Env):
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
         done = False
+        end = False
         reward = 0
 
         if not self.world.in_bounds(self.pos):
             # We went out of the map. Revert.
-            done = True
-            reward -= 5
+            # done = True
+            # reward -= 5
+            end = True
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position
-            done = True
-            reward -= 4
+            # done = True
+            # reward -= 4
+            end = True
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
@@ -54,33 +58,45 @@ class RelayEnv(gym.Env):
                 if self.turns < self.target_turns:
                     reward += 1 / self.target_turns
                 else:
-                    self.world.blocks[self.pos] = BlockType.end.value
-                    done = True
-                    reward += 1
+                    end = True
 
                 self.blocks_in_dir = 0
                 self.turns += 1
                 self.prev_dir = direction
 
-            # Award for keeping block in direction
-            r = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
-            reward += r / (self.target_blocks_per_turn * self.target_turns)
+            if not end:
+                # Award for keeping block in direction
+                r = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
+                reward += r / (self.target_blocks_per_turn * self.target_turns)
 
-            # Award for clustering non-solid blocks together
-            num_neighbors = 0
-            # There must be an adjacent block. Don't count that one.
-            cluster = -1
+                # Award for clustering non-solid blocks together
+                num_neighbors = 0
+                # There must be an adjacent block. Don't count that one.
+                cluster = -1
 
-            for d in DirectionMap.values():
-                ddx, ddy = d.value[1]
-                neighbor_pos = (self.pos[0] + ddx, self.pos[1] + ddy)
-                if self.world.in_bounds(neighbor_pos):
-                    if self.world.blocks[neighbor_pos] != BlockType.solid.value:
-                        cluster += 1
-                    num_neighbors += 1
+                for d in DirectionMap.values():
+                    ddx, ddy = d.value[1]
+                    neighbor_pos = (self.pos[0] + ddx, self.pos[1] + ddy)
+                    if self.world.in_bounds(neighbor_pos):
+                        if self.world.blocks[neighbor_pos] != BlockType.solid.value:
+                            cluster += 1
+                        num_neighbors += 1
 
-            reward += cluster / (num_neighbors * self.size * 0.02) * self.difficulty
-            self.blocks_in_dir += 1
+                reward += cluster / \
+                    (num_neighbors * self.size * 0.03) * self.difficulty
+
+                self.blocks_in_dir += 1
+
+                # Reward for more center blocks
+                reward -= abs(self.pos[0] - self.center_pos[0]) / self.dim[0]
+                reward -= abs(self.pos[1] - self.center_pos[1]) / self.dim[1]
+
+        if end:
+            # We transform the action to marking this as an end block
+            self.world.blocks[prev] = BlockType.end.value
+            done = True
+            # TODO: Should this be rewarded?
+            reward += 1
 
         return self.build_observation(), reward, done, {}
 
@@ -98,10 +114,12 @@ class RelayEnv(gym.Env):
         else:
             self.difficulty = self.target_difficulty
 
-        self.target_turns = round(log(50 * self.difficulty + 1, 1.4) + 1)
-        self.target_blocks_per_turn = round(1 / (0.5 * self.difficulty + 0.2 - 0.01 * self.max_blocks_per_turn) + 1)
+        self.target_turns = 20 * self.difficulty + 3
+        self.target_blocks_per_turn = self.max_blocks_per_turn * \
+            (1 - self.difficulty) + 1
 
         self.world = World(self.dim)
+        self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
 
         if self.target_pos is None:
             # Generate random starting position
