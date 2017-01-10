@@ -32,13 +32,21 @@ for path in [summary_path, model_path]:
 with tf.device("/cpu:0"):
     agent = A3CAgent(
         env.action_space.n,
-        lambda: relay_dense( env.observation_space),
+        lambda: relay_dense(env.observation_space),
         model_path=model_path,
         preprocess=relay_preprocess,
         entropy_factor=0.1
     )
 
     if run:
-        agent.run(env)
+        print('Running')
+
+        with tf.Session() as sess:
+            agent.load(sess)
+            env = track(env)
+            agent.run(sess, env)
+            print('Final state', env.step_cache[-1][0][0])
+            print('Difficulty', env.difficulty)
+            print('Reward', env.total_reward)
     else:
         agent.train(env_name)

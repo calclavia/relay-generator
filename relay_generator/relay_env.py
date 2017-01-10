@@ -37,19 +37,16 @@ class RelayEnv(gym.Env):
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
         done = False
-        end = False
         reward = 0
 
         if not self.world.in_bounds(self.pos):
             # We went out of the map. Revert.
-            # done = True
-            # reward -= 5
-            end = True
+            done = True
+            reward -= 5
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position
-            # done = True
-            # reward -= 4
-            end = True
+            done = True
+            reward -= 4
         else:
             # Empty this block
             self.world.blocks[self.pos] = BlockType.empty.value
@@ -58,13 +55,16 @@ class RelayEnv(gym.Env):
                 if self.turns < self.target_turns:
                     reward += 1 / self.target_turns
                 else:
-                    end = True
+                    # We transform the action to marking this as an end block
+                    self.world.blocks[prev] = BlockType.end.value
+                    done = True
+                    reward += 1
 
                 self.blocks_in_dir = 0
                 self.turns += 1
                 self.prev_dir = direction
 
-            if not end:
+            if not done:
                 # Award for keeping block in direction
                 r = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
                 reward += r / (self.target_blocks_per_turn * self.target_turns)
@@ -90,13 +90,6 @@ class RelayEnv(gym.Env):
                 # Reward for more center blocks
                 reward -= abs(self.pos[0] - self.center_pos[0]) / self.dim[0]
                 reward -= abs(self.pos[1] - self.center_pos[1]) / self.dim[1]
-
-        if end:
-            # We transform the action to marking this as an end block
-            self.world.blocks[prev] = BlockType.end.value
-            done = True
-            # TODO: Should this be rewarded?
-            reward += 1
 
         return self.build_observation(), reward, done, {}
 

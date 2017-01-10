@@ -304,13 +304,7 @@ class A3CAgent:
                     # Each memory corresponds to one input.
                     memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
 
-    def run(self, env):
-        print('Running')
-        with tf.Session() as sess:
-            self.load(sess)
-            self.run_sess(sess, env)
-
-    def run_sess(self, sess, env):
+    def run(self, sess, env):
         memory = Memory(self.preprocess(env, env.reset()), self.time_steps)
         total_reward = 0
         terminal = False
