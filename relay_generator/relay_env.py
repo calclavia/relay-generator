@@ -42,7 +42,7 @@ class RelayEnv(gym.Env):
         if not self.world.in_bounds(self.pos):
             # We went out of the map. Revert.
             done = True
-            reward -= 10
+            reward -= 5
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position. Invalid.
             # # We transform the action to marking this as an end block
@@ -50,9 +50,10 @@ class RelayEnv(gym.Env):
             done = True
             reward -= 5
         else:
-
             if direction != self.prev_dir:
                 # Direction change happened
+                # +1 reward total for getting close to target turns
+                # +1 reward total for achieving target turns
                 if self.turns < self.target_turns:
                     # Empty this block
                     self.world.blocks[self.pos] = BlockType.empty.value
@@ -72,11 +73,11 @@ class RelayEnv(gym.Env):
                 self.world.blocks[self.pos] = BlockType.empty.value
 
             if not done:
-                # Award for keeping block in direction
+                # Award for keeping block in direction (+1 total)
                 dir_reward = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
                 reward += dir_reward / (self.target_blocks_per_turn * self.target_turns)
 
-                # Award for clustering non-solid blocks together
+                # Award for clustering non-solid blocks together (+1 total)
                 # There must be an adjacent block. Don't count that one.
                 num_clusters = 0
 
@@ -88,13 +89,13 @@ class RelayEnv(gym.Env):
                             num_clusters += 1
 
                 cluster_reward = 1 if num_clusters > 1 else -1
-                reward += (cluster_reward / self.size) * self.difficulty
+                reward += cluster_reward / self.size
 
                 self.blocks_in_dir += 1
 
-                # Reward for more center blocks
-                reward += (1 - abs(self.pos[0] - self.center_pos[0]) / self.center_pos[0]) * .3
-                reward += (1 - abs(self.pos[1] - self.center_pos[1]) / self.center_pos[1]) * .3
+                # Reward for more center blocks (+1 total)
+                reward += (1 - abs(self.pos[0] - self.center_pos[0]) / self.center_pos[0]) * .5
+                reward += (1 - abs(self.pos[1] - self.center_pos[1]) / self.center_pos[1]) * .5
 
         return self.build_observation(), reward, done, {}
 
@@ -114,7 +115,7 @@ class RelayEnv(gym.Env):
 
         self.target_turns = 20 * self.difficulty + 3
         self.target_blocks_per_turn = self.max_blocks_per_turn * \
-            (1 - self.difficulty) + 1
+            (1 - self.difficulty) + 5
 
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
