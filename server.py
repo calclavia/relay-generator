@@ -53,7 +53,7 @@ def generate():
     total_reward = 0
     i = 0
     while total_reward < acceptance and i < 100:
-        agent.run_sess(sess, env)
+        agent.run(sess, env)
         total_reward = env.total_reward
         i += 1
 
