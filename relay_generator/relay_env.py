@@ -15,7 +15,7 @@ class RelayEnv(gym.Env):
     def __init__(self, dim=(16, 9)):
         self.dim = dim
         self.size = dim[0] * dim[1]
-        self.max_blocks_per_turn = max(*dim)
+        self.max_blocks_per_turn = min(*dim)
         self.target_difficulty = None
         self.target_pos = None
 
@@ -42,13 +42,13 @@ class RelayEnv(gym.Env):
         if not self.world.in_bounds(self.pos):
             # We went out of the map. Revert.
             done = True
-            reward -= 5
+            reward -= 10
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position. Invalid.
             # # We transform the action to marking this as an end block
             self.world.blocks[prev] = BlockType.end.value
             done = True
-            reward -= 4
+            reward -= 5
         else:
 
             if direction != self.prev_dir:
@@ -65,6 +65,7 @@ class RelayEnv(gym.Env):
 
                 self.blocks_in_dir = 0
                 self.turns += 1
+                self.target_blocks_per_turn = max(self.target_blocks_per_turn - 1, 1)
                 self.prev_dir = direction
             else:
                 # Empty this block
@@ -72,24 +73,22 @@ class RelayEnv(gym.Env):
 
             if not done:
                 # Award for keeping block in direction
-                r = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
-                reward += r / (self.target_blocks_per_turn * self.target_turns)
+                dir_reward = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
+                reward += dir_reward / (self.target_blocks_per_turn * self.target_turns)
 
                 # Award for clustering non-solid blocks together
-                num_neighbors = 0
                 # There must be an adjacent block. Don't count that one.
-                cluster = -1
+                num_clusters = 0
 
                 for d in DirectionMap.values():
                     ddx, ddy = d.value[1]
                     neighbor_pos = (self.pos[0] + ddx, self.pos[1] + ddy)
                     if self.world.in_bounds(neighbor_pos):
                         if self.world.blocks[neighbor_pos] != BlockType.solid.value:
-                            cluster += 1
-                        num_neighbors += 1
+                            num_clusters += 1
 
-                reward += cluster / \
-                    (num_neighbors * self.size * 0.03) * self.difficulty
+                cluster_reward = 1 if num_clusters > 1 else -1
+                reward += (cluster_reward / self.size) * self.difficulty
 
                 self.blocks_in_dir += 1
 
