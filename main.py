@@ -22,7 +22,8 @@ env = gym.make(env_name)
 # Directories
 output_path = './out'
 summary_path = output_path + '/summary'
-model_path = str(options.model) if options.model is not None else output_path + '/model'
+model_path = str(
+    options.model) if options.model is not None else output_path + '/model'
 
 # Make directories for outputs
 for path in [summary_path, model_path]:
@@ -49,4 +50,7 @@ with tf.device("/cpu:0"):
             print('Difficulty', env.difficulty)
             print('Reward', env.total_reward)
     else:
-        agent.train(env_name)
+        agent.train(
+            env_name,
+            optimizer=tf.train.AdamOptimizer(learning_rate=3e-4)
+        )

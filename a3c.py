@@ -129,7 +129,7 @@ class A3CAgent:
               discount=.99,
               summary_path='out/summary/',
               num_workers=multiprocessing.cpu_count(),
-              optimizer=tf.train.AdamOptimizer(learning_rate=1e-3)):
+              optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)):
         print('Training model')
         print(self.model.model.summary())
 

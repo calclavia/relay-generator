@@ -12,7 +12,7 @@ from .util import *
 class RelayEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, dim=(9, 16)):
+    def __init__(self, dim=(16, 9)):
         self.dim = dim
         self.size = dim[0] * dim[1]
         self.max_blocks_per_turn = max(*dim)
@@ -44,15 +44,18 @@ class RelayEnv(gym.Env):
             done = True
             reward -= 5
         elif self.world.blocks[self.pos] != BlockType.solid.value:
-            # We went back to a non-solid position
+            # We went back to a non-solid position. Invalid.
+            # # We transform the action to marking this as an end block
+            self.world.blocks[prev] = BlockType.end.value
             done = True
             reward -= 4
         else:
-            # Empty this block
-            self.world.blocks[self.pos] = BlockType.empty.value
+
             if direction != self.prev_dir:
                 # Direction change happened
                 if self.turns < self.target_turns:
+                    # Empty this block
+                    self.world.blocks[self.pos] = BlockType.empty.value
                     reward += 1 / self.target_turns
                 else:
                     # We transform the action to marking this as an end block
@@ -63,6 +66,9 @@ class RelayEnv(gym.Env):
                 self.blocks_in_dir = 0
                 self.turns += 1
                 self.prev_dir = direction
+            else:
+                # Empty this block
+                self.world.blocks[self.pos] = BlockType.empty.value
 
             if not done:
                 # Award for keeping block in direction
@@ -88,8 +94,8 @@ class RelayEnv(gym.Env):
                 self.blocks_in_dir += 1
 
                 # Reward for more center blocks
-                reward -= abs(self.pos[0] - self.center_pos[0]) / self.dim[0]
-                reward -= abs(self.pos[1] - self.center_pos[1]) / self.dim[1]
+                reward += (1 - abs(self.pos[0] - self.center_pos[0]) / self.center_pos[0]) * .3
+                reward += (1 - abs(self.pos[1] - self.center_pos[1]) / self.center_pos[1]) * .3
 
         return self.build_observation(), reward, done, {}
 
