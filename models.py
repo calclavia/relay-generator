@@ -43,6 +43,7 @@ def relay_dense(input_space):
     # Merge all features
     x = merge([image, feature], mode='concat')
 
+    # TODO: Experiment with structure
     for i in range(3):
         x = Dense(512, name='h' + str(i))(x)
         x = Activation('relu')(x)
