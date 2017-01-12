@@ -38,20 +38,14 @@ def relay_dense(input_space):
     image = Flatten()(image)
 
     # Build feature processing
-    feature = merge([pos_input, difficulty_input],
-                    mode='concat', concat_axis=1)
+    feature = merge([pos_input, difficulty_input], mode='concat', concat_axis=1)
 
     # Merge all features
     x = merge([image, feature], mode='concat')
 
-    x = Dense(512, name='h1')(x)
-    x = Activation('relu')(x)
-
-    x = Dense(512, name='h2')(x)
-    x = Activation('relu')(x)
-
-    x = Dense(1024, name='h3')(x)
-    x = Activation('relu')(x)
+    for i in range(3):
+        x = Dense(512, name='h' + str(i))(x)
+        x = Activation('relu')(x)
 
     return [block_input, pos_input, difficulty_input], x
 

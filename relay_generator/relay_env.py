@@ -20,6 +20,7 @@ class RelayEnv(gym.Env):
         self.target_pos = None
 
         # Observe the world
+        # TODO: Provide current direction as discrete variable.
         self.observation_space = spaces.Tuple((
             spaces.Box(0, num_block_type, shape=dim),
             spaces.Box(np.array([0, 0]), np.array(dim)),
@@ -30,17 +31,36 @@ class RelayEnv(gym.Env):
         self.action_space = spaces.Discrete(num_directions)
 
     def _step(self, action):
-        # Apply action
+        """
+        Good levels (in order of priority):
+        turns ~= target turns
+        empty blocks between turns follow interest/intensity curve
+        non-solid blocks are near each other TODO: Not always optimal
+        empty blocks are near the center of map
+
+        An episode consists of starting at a random position and
+        performing a random walk to create a solution.
+
+        All generated maps are valid solutions.
+
+        The episode ends when the an illegal action is executed.
+        """
+        # Retrieve action
         direction = DirectionMap[action]
         dx, dy = direction.value[1]
+
+        # Apply action
         prev = self.pos
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
         done = False
         reward = 0
 
+        # TODO: Make it so it's impossible to do invalid actions
+
+        # Invalid moves will cause done
         if not self.world.in_bounds(self.pos):
-            # We went out of the map. Revert.
+            # We went out of the map.
             done = True
             reward -= 5
         elif self.world.blocks[self.pos] != BlockType.solid.value:
@@ -73,6 +93,7 @@ class RelayEnv(gym.Env):
                 self.world.blocks[self.pos] = BlockType.empty.value
 
             if not done:
+                # TODO: Seems like too many long
                 # Award for keeping block in direction (+1 total)
                 dir_reward = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
                 reward += dir_reward / (self.target_blocks_per_turn * self.target_turns)
@@ -113,6 +134,7 @@ class RelayEnv(gym.Env):
         else:
             self.difficulty = self.target_difficulty
 
+        # TODO: Logarithmic difficulty relation that approaches 1?
         self.target_turns = 20 * self.difficulty + 3
         self.target_blocks_per_turn = self.max_blocks_per_turn * \
             (1 - self.difficulty) + 5
