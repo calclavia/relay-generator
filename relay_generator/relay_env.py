@@ -9,6 +9,7 @@ from .search import *
 from .util import *
 import random
 
+
 def interest_curve(x):
     """
     Models the interest curve.
@@ -21,6 +22,7 @@ def interest_curve(x):
     res = 0.8 * (- 1 / (x + 1) + 1) * (x + exp(0.05 * x) * sin(30 * x)) + 0.2
     assert 0 <= res and res <= 1
     return res
+
 
 class RelayEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -80,7 +82,7 @@ class RelayEnv(gym.Env):
                     ddx, ddy = d.value[1]
                     neighbor_pos = (prev[0] + ddx, prev[1] + ddy)
                     if self.world.in_bounds(neighbor_pos) and self.world.blocks[neighbor_pos] == BlockType.solid.value:
-                        valid_pos.append[neighbor_pos]
+                        valid_pos.append(neighbor_pos)
 
                 self.pos = random.choice(valid_pos)
                 direction = d
@@ -97,20 +99,23 @@ class RelayEnv(gym.Env):
             self.world.blocks[self.pos] = BlockType.empty.value
 
             if direction != self.prev_dir:
-                # Direction changed. Give turn reward.
+                # Direction changed. Give turn reward. (+1 total)
                 turn_reward = 1 if self.turns < self.target_turns else -1
                 reward += turn_reward / self.target_turns
 
                 # Reset
                 self.blocks_in_dir = 0
                 self.turns += 1
-                # Model number of blocks required in this transition using intensity curve.
-                self.target_blocks_per_turn = self.max_blocks_per_turn * (1 - interest_curve(min(self.turns / self.target_turns, 1))) + 1
+                # Model number of blocks required in this transition using
+                # intensity curve.
+                self.target_blocks_per_turn = self.max_blocks_per_turn * \
+                    (1 - interest_curve(min(self.turns / self.target_turns, 1))) + 1
                 self.prev_dir = direction
 
             # Award for keeping block in direction (+1 total)
             dir_reward = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
-            reward += dir_reward / (self.target_blocks_per_turn * self.target_turns)
+            total = self.target_blocks_per_turn * self.target_turns
+            reward += dir_reward / total
 
             # Award for clustering non-solid blocks together (+1 total)
             # There must be an adjacent block. Don't count that one.
@@ -129,7 +134,6 @@ class RelayEnv(gym.Env):
 
             self.blocks_in_dir += 1
             """
-
             # TODO: Reward for more center blocks (+1 total)
             # Mahattan distance
             # dist_to_center = abs(self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
@@ -169,7 +173,8 @@ class RelayEnv(gym.Env):
         return self.build_observation()
 
     def build_observation(self):
-        return (self.world.blocks, np.array(self.pos), np.array([self.difficulty]))
+        dir_ord = -1 if self.prev_dir is None else self.prev_dir.value[0]
+        return (self.world.blocks, np.array(self.pos), np.array([dir_ord]), np.array([self.difficulty]))
 
     def _render(self, mode='human', close=False):
         pass
