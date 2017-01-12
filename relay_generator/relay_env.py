@@ -27,7 +27,7 @@ def interest_curve(x):
 class RelayEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, dim=(16, 9)):
+    def __init__(self, dim=(14, 9)):
         self.dim = dim
         self.size = dim[0] * dim[1]
         self.max_blocks_per_turn = min(*dim)
@@ -155,8 +155,9 @@ class RelayEnv(gym.Env):
         else:
             self.difficulty = self.target_difficulty
 
-        # TODO: Logarithmic difficulty relation that approaches 1?
-        self.target_turns = 20 * self.difficulty + 3
+        # Number of turns we want.
+        self.target_turns = 40 * (- 1 / (self.difficulty + 1) + 1) + 3
+
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
 

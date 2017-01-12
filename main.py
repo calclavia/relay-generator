@@ -52,5 +52,5 @@ with tf.device("/cpu:0"):
     else:
         agent.train(
             env_name,
-            optimizer=tf.train.AdamOptimizer(learning_rate=1e-3)
+            optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)
         )
