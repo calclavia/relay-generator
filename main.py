@@ -36,7 +36,7 @@ with tf.device("/cpu:0"):
         lambda: relay_dense(env.observation_space),
         model_path=model_path,
         preprocess=relay_preprocess,
-        entropy_factor=0.1
+        entropy_factor=0.05
     )
 
     if run:
@@ -52,5 +52,5 @@ with tf.device("/cpu:0"):
     else:
         agent.train(
             env_name,
-            optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)
+            optimizer=tf.train.AdamOptimizer(learning_rate=5e-4)
         )

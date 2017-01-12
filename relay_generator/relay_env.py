@@ -76,12 +76,14 @@ class RelayEnv(gym.Env):
                 self.world.blocks[prev] = BlockType.end.value
                 done = True
             else:
+                # Must be a starting block. We choose a random direction.
                 valid_pos = []
                 # Pick a random direction that is valid
                 for d in DirectionMap.values():
                     ddx, ddy = d.value[1]
                     neighbor_pos = (prev[0] + ddx, prev[1] + ddy)
-                    if self.world.in_bounds(neighbor_pos) and self.world.blocks[neighbor_pos] == BlockType.solid.value:
+                    if self.world.in_bounds(neighbor_pos):
+                        # Any neighbor in the map must be solid
                         valid_pos.append(neighbor_pos)
 
                 self.pos = random.choice(valid_pos)
@@ -116,10 +118,10 @@ class RelayEnv(gym.Env):
             dir_reward = 1 if self.blocks_in_dir <= self.target_blocks_per_turn else -1
             total = self.target_blocks_per_turn * self.target_turns
             reward += dir_reward / total
+            self.blocks_in_dir += 1
 
-            # Award for clustering non-solid blocks together (+1 total)
+            # Award for clustering non-solid blocks together (+ < 0.5 total)
             # There must be an adjacent block. Don't count that one.
-            """
             num_clusters = 0
 
             for d in DirectionMap.values():
@@ -130,14 +132,12 @@ class RelayEnv(gym.Env):
                         num_clusters += 1
 
             cluster_reward = 1 if num_clusters > 1 else -1
-            reward += cluster_reward / self.size
+            reward += (cluster_reward / self.size) * 0.5
 
-            self.blocks_in_dir += 1
-            """
-            # TODO: Reward for more center blocks (+1 total)
+            # Reward for more center blocks (+0.5 total)
             # Mahattan distance
             # dist_to_center = abs(self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
-            # reward += dist_to_center /
+            # reward += (dist_to_center / self.max_dist_to_center)
 
         return self.build_observation(), reward, done, {}
 
@@ -160,6 +160,7 @@ class RelayEnv(gym.Env):
 
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
+        self.max_dist_to_center = self.center_pos[0] / 2 + self.center_pos[1] / 2
 
         if self.target_pos is None:
             # Generate random starting position
