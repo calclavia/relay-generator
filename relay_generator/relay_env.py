@@ -136,8 +136,8 @@ class RelayEnv(gym.Env):
 
             # Reward for more center blocks (+0.5 total)
             # Mahattan distance
-            # dist_to_center = abs(self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
-            # reward += (dist_to_center / self.max_dist_to_center)
+            dist_to_center = abs(self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
+            reward += dist_to_center / (self.max_dist_to_center * self.size)
 
         return self.build_observation(), reward, done, {}
 
