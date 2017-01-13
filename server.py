@@ -18,7 +18,7 @@ CORS(app)
 env_name = 'relay-generator-v0'
 env = gym.make(env_name)
 
-acceptance = 5
+acceptance = 1
 
 # Global cache
 sess = tf.Session()
