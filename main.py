@@ -36,7 +36,7 @@ with tf.device("/cpu:0"):
         lambda: relay_dense(env.observation_space),
         model_path=model_path,
         preprocess=relay_preprocess,
-        entropy_factor=0.1
+        entropy_factor=0.05
     )
 
     if run:

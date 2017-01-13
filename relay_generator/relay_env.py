@@ -58,7 +58,7 @@ class RelayEnv(gym.Env):
         An episode consists of starting at a random position and
         performing a random walk to create a solution.
         """
-        """
+
         def choose_random(from_pos):
             # Must be a starting block. We choose a random direction.
             valid_pos = []
@@ -71,7 +71,6 @@ class RelayEnv(gym.Env):
                     valid_pos.append(neighbor_pos)
 
             return random.choice(valid_pos), d
-        """
 
         if action == num_directions:
             # This is the done action
@@ -80,19 +79,19 @@ class RelayEnv(gym.Env):
                 return self.build_observation(), 0, True, {}
             else:
                 # This is the start block. We can't call done here!
-                # prev = self.pos
                 # Random movement!
-                # self.pos, direction = choose_random(prev)
-                return self.build_observation(), -max_ep_reward, True, {}
-                reward -= 3
+                prev = self.pos
+                self.pos, direction = choose_random(prev)
+                # return self.build_observation(), -max_ep_reward, True, {}
+                # reward -= 3
+        else:
+            # Retrieve action
+            direction = DirectionMap[action]
+            dx, dy = direction.value[1]
 
-        # Retrieve action
-        direction = DirectionMap[action]
-        dx, dy = direction.value[1]
-
-        # Apply action
-        prev = self.pos
-        self.pos = (self.pos[0] + dx, self.pos[1] + dy)
+            # Apply action
+            prev = self.pos
+            self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
         done = False
         reward = 0
@@ -100,6 +99,7 @@ class RelayEnv(gym.Env):
         # Invalid moves will cause episode to finish
         if not self.world.in_bounds(self.pos):
             # We went out of the map.
+            """
             done = True
             reward -= max_ep_reward
             """
@@ -108,18 +108,19 @@ class RelayEnv(gym.Env):
                 self.world.blocks[prev] = BlockType.end.value
                 done = True
             else:
+                # Previous block must be start. We pick a random move.
                 self.pos, direction = choose_random(prev)
-            """
 
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position.
+            """
             done = True
             reward -= max_ep_reward
             """
             # Previous block MUST be empty. We just end the episode here.
             self.world.blocks[prev] = BlockType.end.value
             done = True
-            """
+
         if not done:
             # This is a valid move
             # Empty this block
