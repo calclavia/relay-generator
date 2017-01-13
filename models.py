@@ -27,7 +27,7 @@ def relay_dense(input_space):
 
     # Build image processing
     image = block_input
-    image = Convolution2D(32, 3, 3, name='conv1')(image)
+    image = Convolution2D(64, 3, 3, name='conv1')(image)
     image = Activation('relu')(image)
     image = Convolution2D(64, 3, 3, name='conv2')(image)
     image = Activation('relu')(image)
@@ -45,11 +45,7 @@ def relay_dense(input_space):
     # Merge all features
     x = merge([image, feature], mode='concat')
 
-    for i in range(3):
-        x = Dense(256, name='h1_' + str(i))(x)
-        x = Activation('relu')(x)
-
-    for i in range(2):
+    for i in range(4):
         x = Dense(512, name='h2_' + str(i))(x)
         x = Activation('relu')(x)
 

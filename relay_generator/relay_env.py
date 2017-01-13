@@ -9,6 +9,7 @@ from .search import *
 from .util import *
 import random
 
+max_ep_reward = 3
 
 def interest_curve(x):
     """
@@ -44,7 +45,7 @@ class RelayEnv(gym.Env):
         ))
 
         # Actions allow the world to be populated.
-        self.action_space = spaces.Discrete(num_directions)
+        self.action_space = spaces.Discrete(num_directions + 1)
 
     def _step(self, action):
         """
@@ -57,6 +58,34 @@ class RelayEnv(gym.Env):
         An episode consists of starting at a random position and
         performing a random walk to create a solution.
         """
+        """
+        def choose_random(from_pos):
+            # Must be a starting block. We choose a random direction.
+            valid_pos = []
+            # Pick a random direction that is valid
+            for d in DirectionMap.values():
+                ddx, ddy = d.value[1]
+                neighbor_pos = (from_pos[0] + ddx, from_pos[1] + ddy)
+                if self.world.in_bounds(neighbor_pos):
+                    # Any neighbor in the map must be solid
+                    valid_pos.append(neighbor_pos)
+
+            return random.choice(valid_pos), d
+        """
+
+        if action == num_directions:
+            # This is the done action
+            if self.world.blocks[self.pos] == BlockType.empty.value:
+                self.world.blocks[self.pos] = BlockType.end.value
+                return self.build_observation(), 0, True, {}
+            else:
+                # This is the start block. We can't call done here!
+                # prev = self.pos
+                # Random movement!
+                # self.pos, direction = choose_random(prev)
+                return self.build_observation(), -max_ep_reward, True, {}
+                reward -= 3
+
         # Retrieve action
         direction = DirectionMap[action]
         dx, dy = direction.value[1]
@@ -71,30 +100,26 @@ class RelayEnv(gym.Env):
         # Invalid moves will cause episode to finish
         if not self.world.in_bounds(self.pos):
             # We went out of the map.
+            done = True
+            reward -= max_ep_reward
+            """
             if self.world.blocks[prev] == BlockType.empty.value:
                 # Previous block is empty. We just end the episode here.
                 self.world.blocks[prev] = BlockType.end.value
                 done = True
             else:
-                # Must be a starting block. We choose a random direction.
-                valid_pos = []
-                # Pick a random direction that is valid
-                for d in DirectionMap.values():
-                    ddx, ddy = d.value[1]
-                    neighbor_pos = (prev[0] + ddx, prev[1] + ddy)
-                    if self.world.in_bounds(neighbor_pos):
-                        # Any neighbor in the map must be solid
-                        valid_pos.append(neighbor_pos)
-
-                self.pos = random.choice(valid_pos)
-                direction = d
+                self.pos, direction = choose_random(prev)
+            """
 
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position.
+            done = True
+            reward -= max_ep_reward
+            """
             # Previous block MUST be empty. We just end the episode here.
             self.world.blocks[prev] = BlockType.end.value
             done = True
-
+            """
         if not done:
             # This is a valid move
             # Empty this block
@@ -134,10 +159,12 @@ class RelayEnv(gym.Env):
             cluster_reward = 1 if num_clusters > 1 else -1
             reward += (cluster_reward / self.size) * 0.5
 
-            # Reward for more center blocks (+0.5 total)
+            # Reward for more center blocks (+ < 0.5 total)
             # Mahattan distance
-            dist_to_center = abs(self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
-            reward += dist_to_center / (self.max_dist_to_center * self.size)
+            dist_to_center = abs(
+                self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
+            reward += (dist_to_center /
+                       (self.max_dist_to_center * self.size)) * 0.5
 
         return self.build_observation(), reward, done, {}
 
@@ -160,7 +187,8 @@ class RelayEnv(gym.Env):
 
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
-        self.max_dist_to_center = self.center_pos[0] / 2 + self.center_pos[1] / 2
+        self.max_dist_to_center = self.center_pos[
+            0] / 2 + self.center_pos[1] / 2
 
         if self.target_pos is None:
             # Generate random starting position
