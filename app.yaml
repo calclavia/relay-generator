@@ -8,4 +8,4 @@ automatic_scaling:
   min_num_instances: 1
 
 skip_files:
-  - out/**/*
+  - ^(.*/)?.*/out/.*$
