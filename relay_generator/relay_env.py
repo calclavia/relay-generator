@@ -146,7 +146,7 @@ class RelayEnv(gym.Env):
             reward += dir_reward / total
             self.blocks_in_dir += 1
 
-            # Award for clustering non-solid blocks together (+ < 0.5 total)
+            # Award for clustering non-solid blocks together (+ < 0.4 total)
             # There must be an adjacent block. Don't count that one.
             num_clusters = 0
 
@@ -158,14 +158,14 @@ class RelayEnv(gym.Env):
                         num_clusters += 1
 
             cluster_reward = 1 if num_clusters > 1 else -1
-            reward += (cluster_reward / self.size) * 0.5
+            reward += (cluster_reward / self.size) * 0.4
 
-            # Reward for more center blocks (+ < 0.5 total)
+            # Reward for more center blocks (+ < 0.4 total)
             # Mahattan distance
             dist_to_center = abs(
                 self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
             reward += (dist_to_center /
-                       (self.max_dist_to_center * self.size)) * 0.5
+                       (self.max_dist_to_center * self.size)) * 0.4
 
         return self.build_observation(), reward, done, {}
 
@@ -184,7 +184,7 @@ class RelayEnv(gym.Env):
             self.difficulty = self.target_difficulty
 
         # Number of turns we want.
-        self.target_turns = 40 * (- 1 / (self.difficulty + 1) + 1) + 3
+        self.target_turns = 40 * (- 1 / (self.difficulty + 1) + 1) + 1
 
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
