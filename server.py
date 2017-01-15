@@ -7,8 +7,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS, cross_origin
 
 import relay_generator
-from a3c import A3CAgent
-from util import track
+from rl import *
 from models import *
 
 app = Flask(__name__)

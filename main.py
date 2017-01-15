@@ -4,7 +4,8 @@ Runner file used to train the neural network.
 import tensorflow as tf
 import gym
 
-from a3c import *
+from models import *
+from rl import *
 from optparse import OptionParser
 
 import relay_generator
