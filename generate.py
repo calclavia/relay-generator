@@ -18,8 +18,8 @@ env = gym.make(env_name)
 
 acceptance = 1.1
 difficulty_steps = 100
-random_steps = 100
-max_tries = 100
+random_steps = 50
+max_tries = 1000
 
 
 def track(env):
