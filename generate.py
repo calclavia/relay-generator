@@ -8,6 +8,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 import relay_generator
+from relay_generator.util import Direction
 from rl import *
 from models import *
 from world_pb2 import WorldSet, Direction as ProtoDir
@@ -18,7 +19,7 @@ env = gym.make(env_name)
 
 acceptance = 1.1
 difficulty_steps = 100
-random_steps = 50
+random_steps = 100
 max_tries = 1000
 
 
@@ -30,8 +31,15 @@ def track(env):
 
     def step_override(*args, **kwargs):
         result = step(*args, **kwargs)
-        env.actions.append(args[0])
-        env.step_cache.append(result)
+        # Disregard actions after done
+        if not result[2]:
+            actual_dir = env.direction.value[1]
+            # Convert actual direction to action
+            for d_obj in Direction:
+                d = d_obj.value
+                if d[1][0] == actual_dir[0] and\
+                   d[1][1] == actual_dir[1]:
+                   env.actions.append(d[0])
         env.total_reward += result[1]
         return result
     env.step = step_override
@@ -40,7 +48,6 @@ def track(env):
 
     def reset_override(*args, **kwargs):
         env.total_reward = 0
-        env.step_cache = []
         env.actions = []
         return reset(*args, **kwargs)
     env.reset = reset_override

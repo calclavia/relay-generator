@@ -93,16 +93,15 @@ class RelayEnv(gym.Env):
             prev = self.pos
             self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
+        # Expose direction. Mainly used for genereate
+        self.direction = direction
+
         done = False
         reward = 0
 
         # Invalid moves will cause episode to finish
         if not self.world.in_bounds(self.pos):
             # We went out of the map.
-            """
-            done = True
-            reward -= max_ep_reward
-            """
             if self.world.blocks[prev] == BlockType.empty.value:
                 # Previous block is empty. We just end the episode here.
                 self.world.blocks[prev] = BlockType.end.value
@@ -113,10 +112,6 @@ class RelayEnv(gym.Env):
 
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position.
-            """
-            done = True
-            reward -= max_ep_reward
-            """
             # Previous block MUST be empty. We just end the episode here.
             self.world.blocks[prev] = BlockType.end.value
             done = True
