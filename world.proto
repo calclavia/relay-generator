@@ -1,0 +1,22 @@
+syntax = "proto3";
+package relay;
+
+// Movement direction
+enum Direction {
+  RIGHT = 0;
+  LEFT = 1;
+  UP = 2;
+  DOWN = 3;
+}
+
+// An encoding of the world object
+message World {
+  // A sequence of directions to compute the solution
+  repeated Direction dirs = 1;
+}
+
+// A set of worlds with same starting position
+message WorldSet {
+  // A set of random worlds
+  repeated World worlds = 1;
+}
