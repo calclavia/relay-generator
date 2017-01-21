@@ -18,10 +18,8 @@ env_name = 'relay-generator-v0'
 env = gym.make(env_name)
 
 acceptance = 1.1
-difficulty_steps = 100
-random_steps = 100
-max_tries = 1000
-
+difficulty_steps = 1000
+random_steps = 20
 
 def track(env):
     """
@@ -62,33 +60,26 @@ def generate(pos):
         world_set = WorldSet()
         truncated_difficulty = float(i) / difficulty_steps
 
-        for k in range(random_steps):
-            world = world_set.worlds.add()
-            difficulty = float(i * k) / (difficulty_steps * random_steps)
+        # Set env
+        env.target_difficulty = truncated_difficulty
+        env.target_pos = pos
 
-            # Set env
-            env.target_difficulty = difficulty
-            env.target_pos = pos
+        # Keep generating until we have sufficient maps
+        k = 0
+        while k < random_steps:
+            agent.run(sess, env)
+            if env.total_reward < acceptance:
+                world = world_set.worlds.add()
 
-            # Keep generating until we have a valid map
-            total_reward = 0
-            j = 0
-            while total_reward < acceptance and j < max_tries:
-                agent.run(sess, env)
-                total_reward = env.total_reward
-                j += 1
-
-            if total_reward < acceptance:
-                raise 'Unable to generate valid solution'
-
-            for a in env.actions:
-                world.dirs.append(a)
+                for a in env.actions:
+                    world.dirs.append(a)
+                k += 1
 
         directory = 'out/gen/{}_{}/'.format(pos[0], pos[1])
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        with open(directory + '/{}'.format(truncated_difficulty), 'wb') as f:
+        with open(directory + '/{0:.3f}'.format(truncated_difficulty), 'wb') as f:
             f.write(world_set.SerializeToString())
     return None
 

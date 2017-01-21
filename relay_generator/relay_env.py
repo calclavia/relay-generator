@@ -82,8 +82,6 @@ class RelayEnv(gym.Env):
                 # Random movement!
                 prev = self.pos
                 self.pos, direction = choose_random(prev)
-                # return self.build_observation(), -max_ep_reward, True, {}
-                # reward -= 3
         else:
             # Retrieve action
             direction = DirectionMap[action]
@@ -92,9 +90,6 @@ class RelayEnv(gym.Env):
             # Apply action
             prev = self.pos
             self.pos = (self.pos[0] + dx, self.pos[1] + dy)
-
-        # Expose direction. Mainly used for genereate
-        self.direction = direction
 
         done = False
         reward = 0
@@ -161,6 +156,9 @@ class RelayEnv(gym.Env):
                 self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
             reward += (dist_to_center /
                        (self.max_dist_to_center * self.size)) * 0.4
+
+        # Expose direction. Mainly used for genereate
+        self.direction = direction
 
         return self.build_observation(), reward, done, {}
 
