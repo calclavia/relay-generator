@@ -18,8 +18,9 @@ env_name = 'relay-generator-v0'
 env = gym.make(env_name)
 
 acceptance = 1.1
-difficulty_steps = 1000
-random_steps = 20
+difficulty_steps = 500
+min_random_steps = 10
+max_random_steps = 40
 
 def track(env):
     """
@@ -66,6 +67,8 @@ def generate(pos):
 
         # Keep generating until we have sufficient maps
         k = 0
+        # Number of random steps decreases proportional to difficulty
+        random_steps = (1 - truncated_difficulty) * (max_random_steps - min_random_steps) + min_random_steps
         while k < random_steps:
             agent.run(sess, env)
             if env.total_reward < acceptance:
