@@ -32,13 +32,8 @@ def track(env):
         result = step(*args, **kwargs)
         # Disregard actions after done
         if not result[2]:
-            actual_dir = env.direction.value[1]
-            # Convert actual direction to action
-            for d_obj in Direction:
-                d = d_obj.value
-                if d[1][0] == actual_dir[0] and\
-                   d[1][1] == actual_dir[1]:
-                   env.actions.append(d[0])
+            info = result[3]
+            env.actions.append(info['actual_dir'].value[0])
         env.total_reward += result[1]
         return result
     env.step = step_override
@@ -56,6 +51,7 @@ def track(env):
 
 def generate(pos):
     print('Generating pos: ', pos)
+    env = track(gym.make(env_name))
 
     for i in range(difficulty_steps):
         world_set = WorldSet()
@@ -68,7 +64,8 @@ def generate(pos):
         # Keep generating until we have sufficient maps
         k = 0
         # Number of random steps decreases proportional to difficulty
-        random_steps = (1 - truncated_difficulty) * (max_random_steps - min_random_steps) + min_random_steps
+        random_steps = (1 - truncated_difficulty) * \
+            (max_random_steps - min_random_steps) + min_random_steps
         while k < random_steps:
             agent.run(sess, env)
             if env.total_reward < acceptance:
@@ -99,8 +96,12 @@ with tf.device("/cpu:0"):
 
     agent.load(sess)
 
-    env = track(gym.make(env_name))
+    with ThreadPoolExecutor() as executor:
+        threads = []
 
-    for r in range(env.dim[0]):
-        for c in range(env.dim[1]):
-            generate((r, c))
+        for r in range(env.dim[0]):
+            for c in range(env.dim[1]):
+                threads.append(executor.submit(generate, (r, c)))
+
+        for t in threads:
+            t.result()

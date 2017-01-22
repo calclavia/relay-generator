@@ -11,6 +11,7 @@ import random
 
 max_ep_reward = 3
 
+
 def interest_curve(x):
     """
     Models the interest curve.
@@ -157,10 +158,12 @@ class RelayEnv(gym.Env):
             reward += (dist_to_center /
                        (self.max_dist_to_center * self.size)) * 0.4
 
-        # Expose direction. Mainly used for genereate
-        self.direction = direction
+        info = {
+            # The actual direction the agent took
+            'actual_dir': direction
+        }
 
-        return self.build_observation(), reward, done, {}
+        return self.build_observation(), reward, done, info
 
     def _reset(self):
         # Number of blocks in the same direction
