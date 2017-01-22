@@ -69,9 +69,9 @@ class RelayEnv(gym.Env):
                 neighbor_pos = (from_pos[0] + ddx, from_pos[1] + ddy)
                 if self.world.in_bounds(neighbor_pos):
                     # Any neighbor in the map must be solid
-                    valid_pos.append(neighbor_pos)
+                    valid_pos.append((neighbor_pos, d))
 
-            return random.choice(valid_pos), d
+            return random.choice(valid_pos)
 
         if action == num_directions:
             # This is the done action

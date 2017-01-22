@@ -17,10 +17,11 @@ from world_pb2 import WorldSet, Direction as ProtoDir
 env_name = 'relay-generator-v0'
 env = gym.make(env_name)
 
-acceptance = 1.1
+acceptance = 1.2
 difficulty_steps = 500
 min_random_steps = 10
 max_random_steps = 40
+max_workers = 8
 
 def track(env):
     """
@@ -66,9 +67,11 @@ def generate(pos):
         # Number of random steps decreases proportional to difficulty
         random_steps = (1 - truncated_difficulty) * \
             (max_random_steps - min_random_steps) + min_random_steps
+
+        # While we still need more worlds
         while k < random_steps:
             agent.run(sess, env)
-            if env.total_reward < acceptance:
+            if env.total_reward >= acceptance:
                 world = world_set.worlds.add()
 
                 for a in env.actions:
@@ -96,7 +99,7 @@ with tf.device("/cpu:0"):
 
     agent.load(sess)
 
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         threads = []
 
         for r in range(env.dim[0]):
