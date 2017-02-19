@@ -31,27 +31,28 @@ for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-with tf.device("/cpu:0"):
+with tf.device("/cpu:0"),  tf.Session() as sess:
     agent = A3CAgent(
-        env.action_space.n,
-        lambda: relay_dense(env.observation_space),
+        lambda: relay_dense(env.observation_space, env.action_space.n),
         model_path=model_path,
         preprocess=relay_preprocess,
         entropy_factor=0.05
     )
 
-    if run:
-        print('Running')
+    try:
+        agent.load(sess)
+        print('Loading last saved session')
+    except:
+        print('Starting new session')
 
-        with tf.Session() as sess:
-            agent.load(sess)
-            env = track(env)
-            agent.run(sess, env)
-            print('Final state', env.step_cache[-1][0][0])
-            print('Difficulty', env.difficulty)
-            print('Reward', env.total_reward)
+    agent.compile(sess)
+    
+    if run:
+        env = track(env)
+        agent.run(sess, env)
+        print('Final state', env.step_cache[-1][0][0])
+        print('Difficulty', env.difficulty)
+        print('Reward', env.total_reward)
     else:
-        agent.train(
-            env_name,
-            optimizer=tf.train.AdamOptimizer(learning_rate=1e-4)
-        )
+        print('Training')
+        agent.train(sess, lambda: gym.make(env_name)).join()

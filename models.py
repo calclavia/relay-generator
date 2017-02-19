@@ -3,27 +3,24 @@ from keras.layers import Dense, Input, merge, Activation, Flatten
 from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution2D
 from keras.models import Model
-from keras.regularizers import l2, activity_l2
 
-
-def relay_dense(input_space):
+def relay_dense(input_space, num_actions):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
 
     # Define inputs
     block_input = Input(
-        shape=(
+        (
             map_space.shape[0],
             map_space.shape[1],
             num_block_types
         ),
         name='block_input'
     )
-    pos_input = Input(shape=pos_shape.shape, name='pos_input')
-    dir_input = Input(shape=(dir_shape.n,), name='dir_input')
-    difficulty_input = Input(
-        shape=difficulty_shape.shape, name='difficulty_input')
+    pos_input = Input(pos_shape.shape, name='pos_input')
+    dir_input = Input((dir_shape.n,), name='dir_input')
+    difficulty_input = Input(difficulty_shape.shape, name='difficulty_input')
 
     # Build image processing
     image = block_input
@@ -49,7 +46,12 @@ def relay_dense(input_space):
         x = Dense(512, name='h2_' + str(i))(x)
         x = Activation('relu')(x)
 
-    return [block_input, pos_input, dir_input, difficulty_input], x
+    # Multi-label
+    policy = Dense(num_actions, name='policy', activation='softmax')(x)
+    value = Dense(1, name='value', activation='linear')(x)
+
+    model = Model([block_input, pos_input, dir_input, difficulty_input], [policy, value])
+    return model
 
 
 def relay_preprocess(env, observation):
