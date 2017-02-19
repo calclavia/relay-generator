@@ -8,7 +8,7 @@ from keras import backend as K
 from models import *
 from rl import *
 from optparse import OptionParser
-
+import os
 import relay_generator
 
 parser = OptionParser()
@@ -44,10 +44,12 @@ with tf.device("/cpu:0"), tf.Session() as sess:
     try:
         agent.load(sess)
         print('Loading last saved session')
-    except:
+    except Exception as e:
         print('Starting new session')
+        print(e)
 
     agent.compile(sess)
+    agent.save(sess)
 
     if run:
         env = track(env)

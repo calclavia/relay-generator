@@ -24,33 +24,34 @@ def relay_dense(input_space, num_actions):
 
     # Build image processing
     image = block_input
-    image = Convolution2D(64, 3, 3, name='conv1')(image)
+    image = Convolution2D(32, 3, 3, name='conv1')(image)
     image = Activation('relu')(image)
     image = Convolution2D(64, 3, 3, name='conv2')(image)
     image = Activation('relu')(image)
     image = Convolution2D(128, 3, 3, name='conv3')(image)
     image = Activation('relu')(image)
-    image = Convolution2D(256, 3, 3, name='conv4')(image)
-    image = Activation('relu')(image)
 
-    image = Flatten()(image)
+    # Build context feature processing
+    context = merge([pos_input, dir_input,  difficulty_input],
+                    mode='concat', concat_axis=1, name='context')
+    context = Dense(32, name='context_distributed')(context)
 
-    # Build feature processing
-    feature = merge([pos_input, dir_input,  difficulty_input],
-                    mode='concat', concat_axis=1)
-
-    # Merge all features
-    x = merge([image, feature], mode='concat')
+    x = Flatten()(image)
 
     for i in range(4):
-        x = Dense(512, name='h2_' + str(i))(x)
+        y = x
+        x = merge([x, context], mode='concat')
+        x = Dense(256, name='h_' + str(i))(x)
+        if i > 0:
+            x = merge([x, y], mode='sum')
         x = Activation('relu')(x)
 
     # Multi-label
     policy = Dense(num_actions, name='policy', activation='softmax')(x)
     value = Dense(1, name='value', activation='linear')(x)
 
-    model = Model([block_input, pos_input, dir_input, difficulty_input], [policy, value])
+    model = Model([block_input, pos_input, dir_input,
+                   difficulty_input], [policy, value])
     return model
 
 
