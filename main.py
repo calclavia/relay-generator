@@ -3,6 +3,7 @@ Runner file used to train the neural network.
 """
 import tensorflow as tf
 import gym
+from keras import backend as K
 
 from models import *
 from rl import *
@@ -23,15 +24,16 @@ env = gym.make(env_name)
 # Directories
 output_path = './out'
 summary_path = output_path + '/summary'
-model_path = str(
-    options.model) if options.model is not None else output_path + '/model'
+model_path = str(options.model) if options.model is not None else output_path + '/model'
 
 # Make directories for outputs
 for path in [summary_path, model_path]:
     if not os.path.exists(path):
         os.makedirs(path)
 
-with tf.device("/cpu:0"),  tf.Session() as sess:
+with tf.device("/cpu:0"), tf.Session() as sess:
+    K.set_session(sess)
+
     agent = A3CAgent(
         lambda: relay_dense(env.observation_space, env.action_space.n),
         model_path=model_path,
@@ -46,7 +48,7 @@ with tf.device("/cpu:0"),  tf.Session() as sess:
         print('Starting new session')
 
     agent.compile(sess)
-    
+
     if run:
         env = track(env)
         agent.run(sess, env)
