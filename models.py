@@ -3,11 +3,12 @@ from keras.layers import Dense, Input, merge, Activation, Flatten
 from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution2D
 from keras.models import Model
+from relay_generator import BlockType
 #from keras.layers.normalization import BatchNormalization
 
-def conv(filters, res=None, border_mode='same'):
+def conv(filters, res=None, filter_size=(3, 3), border_mode='same'):
     def f(x):
-        x = Convolution2D(filters, 3, 3, border_mode=border_mode)(x)
+        x = Convolution2D(filters, filter_size[0], filter_size[1], border_mode=border_mode)(x)
         if res is not None:
             x = merge([x, res], mode='sum')
 
@@ -24,7 +25,7 @@ def dense(units):
         return x
     return f
 
-def relay_dense(input_space, num_actions):
+def relay_dense(input_space, num_actions, units=512):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
@@ -34,7 +35,7 @@ def relay_dense(input_space, num_actions):
         (
             map_space.shape[0],
             map_space.shape[1],
-            num_block_types
+            1
         ),
         name='block_input'
     )
@@ -45,23 +46,21 @@ def relay_dense(input_space, num_actions):
     # Build image processing
     image = block_input
 
-    image = conv(16, border_mode='valid')(image)
-    image = conv(16, border_mode='valid')(image)
     image = conv(32, border_mode='valid')(image)
     image = conv(32, border_mode='valid')(image)
+    image = conv(64, border_mode='valid')(image)
+    image = conv(128, border_mode='valid')(image)
 
     image = Flatten()(image)
 
     # Build context feature processing
-    context = merge([pos_input, dir_input, difficulty_input],
-                    mode='concat', concat_axis=1, name='context')
-    context = dense(512)(context)
+    context = merge([pos_input, dir_input, difficulty_input], mode='concat', name='context')
+    context = dense(units)(context)
 
-    x = dense(512)(image)
-    x = merge([x, context], mode='sum')
-    x = dense(512)(x)
-    x = merge([x, context], mode='sum')
-    x = dense(512)(x)
+    for i in range(2):
+        x = Dense(units)(image)
+        x = merge([x, context], mode='sum')
+        x = Activation('relu')(x)
 
     # Multi-label
     policy = Dense(num_actions, name='policy', activation='softmax')(x)
@@ -81,8 +80,10 @@ def relay_preprocess(env, observation):
     num_block_types = int((map_space.high - map_space.low).max())
 
     map_state, pos_state, dir_state, difficulty_state = observation
-    # Turn map_state into a one-hot channel bit image
-    map_state = (np.arange(num_block_types) == map_state[:, :, None] - 1)
+
+    # Turn map_state into a one-hot bit image
+    map_state = np.reshape(np.sign(map_state), map_state.shape + (1,))
+
     # One hot the dir_state
     dir_state_hot = np.zeros((dir_shape.n,))
     dir_state_hot[dir_state[0] + 1] = 1

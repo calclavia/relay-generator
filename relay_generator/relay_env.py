@@ -178,12 +178,11 @@ class RelayEnv(gym.Env):
             self.difficulty = self.target_difficulty
 
         # Number of turns we want.
-        self.target_turns = 40 * (- 1 / (self.difficulty + 1) + 1) + 1
+        self.target_turns = 50 * (- 1 / (self.difficulty + 1) + 1) + 1
 
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
-        self.max_dist_to_center = self.center_pos[
-            0] / 2 + self.center_pos[1] / 2
+        self.max_dist_to_center = self.center_pos[0] / 2 + self.center_pos[1] / 2
 
         if self.target_pos is None:
             # Generate random starting position

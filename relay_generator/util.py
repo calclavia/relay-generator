@@ -27,7 +27,7 @@ class MoveDirection(Enum):
 num_block_type = 4
 
 class BlockType(Enum):
-    empty = 0
-    solid = 1
+    solid = 0
+    empty = 1
     start = 2
     end = 3
