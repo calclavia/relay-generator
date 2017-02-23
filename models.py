@@ -3,6 +3,26 @@ from keras.layers import Dense, Input, merge, Activation, Flatten
 from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution2D
 from keras.models import Model
+#from keras.layers.normalization import BatchNormalization
+
+def conv(filters, res=None, border_mode='same'):
+    def f(x):
+        x = Convolution2D(filters, 3, 3, border_mode=border_mode)(x)
+        if res is not None:
+            x = merge([x, res], mode='sum')
+
+        #x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        return x
+    return f
+
+def dense(units):
+    def f(x):
+        x = Dense(units)(x)
+        #x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        return x
+    return f
 
 def relay_dense(input_space, num_actions):
     # Build Network
@@ -24,27 +44,24 @@ def relay_dense(input_space, num_actions):
 
     # Build image processing
     image = block_input
-    image = Convolution2D(32, 3, 3, name='conv1')(image)
-    image = Activation('relu')(image)
-    image = Convolution2D(64, 3, 3, name='conv2')(image)
-    image = Activation('relu')(image)
-    image = Convolution2D(128, 3, 3, name='conv3')(image)
-    image = Activation('relu')(image)
+
+    image = conv(16, border_mode='valid')(image)
+    image = conv(16, border_mode='valid')(image)
+    image = conv(32, border_mode='valid')(image)
+    image = conv(32, border_mode='valid')(image)
+
+    image = Flatten()(image)
 
     # Build context feature processing
-    context = merge([pos_input, dir_input,  difficulty_input],
+    context = merge([pos_input, dir_input, difficulty_input],
                     mode='concat', concat_axis=1, name='context')
-    context = Dense(32, name='context_distributed')(context)
+    context = dense(512)(context)
 
-    x = Flatten()(image)
-
-    for i in range(4):
-        y = x
-        x = merge([x, context], mode='concat')
-        x = Dense(256, name='h_' + str(i))(x)
-        if i > 0:
-            x = merge([x, y], mode='sum')
-        x = Activation('relu')(x)
+    x = dense(512)(image)
+    x = merge([x, context], mode='sum')
+    x = dense(512)(x)
+    x = merge([x, context], mode='sum')
+    x = dense(512)(x)
 
     # Multi-label
     policy = Dense(num_actions, name='policy', activation='softmax')(x)
