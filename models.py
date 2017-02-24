@@ -4,28 +4,25 @@ from keras.layers.recurrent import LSTM
 from keras.layers.convolutional import Convolution2D
 from keras.models import Model
 from relay_generator import BlockType
-#from keras.layers.normalization import BatchNormalization
+from keras.regularizers import l2, activity_l2
 
 def conv(filters, res=None, filter_size=(3, 3), border_mode='same'):
     def f(x):
-        x = Convolution2D(filters, filter_size[0], filter_size[1], border_mode=border_mode)(x)
+        x = Convolution2D(filters, filter_size[0], filter_size[1], border_mode=border_mode, W_regularizer=l2(0.01), activity_regularizer=activity_l2(0.01))(x)
         if res is not None:
             x = merge([x, res], mode='sum')
-
-        #x = BatchNormalization()(x)
         x = Activation('relu')(x)
         return x
     return f
 
 def dense(units):
     def f(x):
-        x = Dense(units)(x)
-        #x = BatchNormalization()(x)
+        x = Dense(units, W_regularizer=l2(0.01), activity_regularizer=activity_l2(0.01))(x)
         x = Activation('relu')(x)
         return x
     return f
 
-def relay_dense(input_space, num_actions, units=512):
+def relay_dense(input_space, num_actions, units=200):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
@@ -46,10 +43,10 @@ def relay_dense(input_space, num_actions, units=512):
     # Build image processing
     image = block_input
 
-    image = conv(32, border_mode='valid')(image)
+    image = conv(8, border_mode='valid')(image)
+    image = conv(16, border_mode='valid')(image)
     image = conv(32, border_mode='valid')(image)
     image = conv(64, border_mode='valid')(image)
-    image = conv(128, border_mode='valid')(image)
 
     image = Flatten()(image)
 
@@ -57,10 +54,9 @@ def relay_dense(input_space, num_actions, units=512):
     context = merge([pos_input, dir_input, difficulty_input], mode='concat', name='context')
     context = dense(units)(context)
 
-    for i in range(2):
-        x = Dense(units)(image)
-        x = merge([x, context], mode='sum')
-        x = Activation('relu')(x)
+    x = Dense(units, W_regularizer=l2(0.01), activity_regularizer=activity_l2(0.01))(image)
+    x = merge([x, context], mode='sum')
+    x = Activation('relu')(x)
 
     # Multi-label
     policy = Dense(num_actions, name='policy', activation='softmax')(x)

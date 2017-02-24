@@ -1,38 +1,42 @@
 # Relay Level Generator
-Automatic level generation trained using reinforcement learning for Relay.
-Uses A3C algorithm with OpenAI Gym, Keras and Tensorflow.
+Relay is an action game that tests your reflex skills! In every level, your mission is to relay the circle to the goal. Relay uses deep learning to create levels that match your skill level, with unique levels every single game adapted to you.
 
-See `requirements.txt` for dependencies
+This repository contains the architecture used to train the level generator in Relay. Automatic level generation is trained using reinforcement learning. For more details,
+see blog posts https://medium.com/@henrymao/reinforcement-learning-using-asynchronous-advantage-actor-critic-704147f91686#.n1mvh7mpg and https://medium.com/@henrymao/applying-deep-learning-to-puzzle-level-design-15e9372b562#.z1tln9rzr.
 
+Download Relay on the app store!
+- App Store https://itunes.apple.com/us/app/relay/id1203089200
+- Google Play https://play.google.com/store/apps/details?id=com.calclavia.relay
+
+## Dependencies
 Runs with Python 3.5.
 
-## Running using Virtualenv
-Install Virtualenv
-```
-sudo pip install virtualenv
-```
+We used A3C algorithm with OpenAI Gym, Keras and Tensorflow as our primary tools.
 
-Create an isolated Python environment, and install dependencies:
+See `requirements.txt` for all dependencies.
+
+To setup Python, run:
 ```
-virtualenv env
-source env/bin/activate
 pip install -r requirements.txt
 ```
 
 ## Train Model
+To train your own model, run:
 ```
 python main.py
 ```
 
+We have a sample model in the archives folder that is used in our production game.
+
 ## Run Model
+To run the model and generate a level, run:
 ```
 python main.py -r True
 ```
+This will output the level as an array to the console.
 
-For Relay, we used Keras.js to run the model in production environment (https://github.com/transcranial/keras-js).
+For the game Relay, we used Keras.js to run the model in production environment (https://github.com/transcranial/keras-js).
 
 ## References
 - https://github.com/openai/gym/tree/master/gym/envs
-- http://ai.berkeley.edu/project_overview.html
 - https://arxiv.org/pdf/1602.01783v2.pdf
-- http://www.nature.com/nature/journal/v518/n7540/abs/nature14236.html

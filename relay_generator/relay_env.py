@@ -153,8 +153,7 @@ class RelayEnv(gym.Env):
             # Mahattan distance
             dist_to_center = abs(
                 self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
-            reward += (dist_to_center /
-                       (self.max_dist_to_center * self.size)) * 0.4
+            reward += (dist_to_center / (self.max_dist_to_center * self.size)) * 0.4
 
         info = {
             # The actual direction the agent took

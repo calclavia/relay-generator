@@ -38,7 +38,7 @@ with tf.device("/cpu:0"), tf.Session() as sess:
         lambda: relay_dense(env.observation_space, env.action_space.n),
         model_path=model_path,
         preprocess=relay_preprocess,
-        entropy_factor=0.04
+        entropy_factor=0.02
     )
 
     agent.compile(sess)
