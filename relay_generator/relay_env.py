@@ -69,6 +69,9 @@ class RelayEnv(gym.Env):
                     # Any neighbor in the map must be solid
                     valid_pos.append((neighbor_pos, d))
 
+            if len(valid_pos) == 0:
+                return None
+
             return random.choice(valid_pos)
 
         if action == num_directions:
@@ -106,9 +109,14 @@ class RelayEnv(gym.Env):
 
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position.
-            # Previous block MUST be empty. We just end the episode here.
-            self.world.blocks[prev] = BlockType.end.value
-            done = True
+            # TODO: Previous block MUST be empty. We just end the episode here.
+            # self.world.blocks[prev] = BlockType.end.value
+            # Make a random move
+            rmove = choose_random(prev)
+            if rmove is None:
+                done = True
+            else:
+                self.pos, direction = rmove
 
         if not done:
             # This is a valid move
@@ -149,11 +157,11 @@ class RelayEnv(gym.Env):
             cluster_reward = 1 if num_clusters > 1 else -1
             reward += (cluster_reward / self.size) * 0.4
 
-            # Reward for more center blocks (+ < 0.4 total)
+            # Reward for more center blocks (+ < 0.3 total)
             # Mahattan distance
             dist_to_center = abs(
                 self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
-            reward += (dist_to_center / (self.max_dist_to_center * self.size)) * 0.4
+            reward += (dist_to_center / (self.max_dist_to_center * self.size)) * 0.3
 
         info = {
             # The actual direction the agent took
