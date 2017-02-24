@@ -22,7 +22,7 @@ def dense(units):
         return x
     return f
 
-def relay_dense(input_space, num_actions, units=200):
+def relay_dense(input_space, num_actions, units=256):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
@@ -43,10 +43,10 @@ def relay_dense(input_space, num_actions, units=200):
     # Build image processing
     image = block_input
 
+    image = conv(4, border_mode='valid')(image)
     image = conv(8, border_mode='valid')(image)
     image = conv(16, border_mode='valid')(image)
     image = conv(32, border_mode='valid')(image)
-    image = conv(64, border_mode='valid')(image)
 
     image = Flatten()(image)
 

@@ -4,6 +4,12 @@ Relay is an action game that tests your reflex skills! In every level, your miss
 This repository contains the architecture used to train the level generator in Relay. Automatic level generation is trained using reinforcement learning. For more details,
 see blog posts https://medium.com/@henrymao/reinforcement-learning-using-asynchronous-advantage-actor-critic-704147f91686#.n1mvh7mpg and https://medium.com/@henrymao/applying-deep-learning-to-puzzle-level-design-15e9372b562#.z1tln9rzr.
 
+### Training Graph
+![Training Graph](https://i.gyazo.com/f4b6db2118fd04f091201f8d4f3db0c1.png)
+
+### Generated Level
+![Generated Level](https://i.gyazo.com/54eb049d382d5f0236c6878b90487134.png)
+
 Download Relay on the app store!
 - App Store https://itunes.apple.com/us/app/relay/id1203089200
 - Google Play https://play.google.com/store/apps/details?id=com.calclavia.relay
