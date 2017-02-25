@@ -22,7 +22,7 @@ def dense(units):
         return x
     return f
 
-def relay_dense(input_space, num_actions, units=256):
+def relay_dense(input_space, num_actions, units=128):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
@@ -44,9 +44,9 @@ def relay_dense(input_space, num_actions, units=256):
     image = block_input
 
     image = conv(4, border_mode='valid')(image)
+    image = conv(4, border_mode='valid')(image)
     image = conv(8, border_mode='valid')(image)
     image = conv(16, border_mode='valid')(image)
-    image = conv(32, border_mode='valid')(image)
 
     image = Flatten()(image)
 
@@ -59,8 +59,8 @@ def relay_dense(input_space, num_actions, units=256):
     x = Activation('relu')(x)
 
     # Multi-label
-    policy = Dense(num_actions, name='policy', activation='softmax')(x)
-    value = Dense(1, name='value', activation='linear')(x)
+    policy = Dense(num_actions, name='policy', activation='softmax', W_regularizer=l2(0.01), activity_regularizer=activity_l2(0.01))(x)
+    value = Dense(1, name='value', activation='linear', W_regularizer=l2(0.01), activity_regularizer=activity_l2(0.01))(x)
 
     model = Model([block_input, pos_input, dir_input,
                    difficulty_input], [policy, value])

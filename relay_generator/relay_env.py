@@ -99,18 +99,15 @@ class RelayEnv(gym.Env):
         # Invalid moves will cause episode to finish
         if not self.world.in_bounds(self.pos):
             # We went out of the map.
-            if self.world.blocks[prev] == BlockType.empty.value:
-                # Previous block is empty. We just end the episode here.
-                self.world.blocks[prev] = BlockType.end.value
+            # Make a random move instead
+            rmove = choose_random(prev)
+            if rmove is None:
                 done = True
             else:
-                # Previous block must be start. We pick a random move.
-                self.pos, direction = choose_random(prev)
+                self.pos, direction = rmove
 
         elif self.world.blocks[self.pos] != BlockType.solid.value:
             # We went back to a non-solid position.
-            # TODO: Previous block MUST be empty. We just end the episode here.
-            # self.world.blocks[prev] = BlockType.end.value
             # Make a random move
             rmove = choose_random(prev)
             if rmove is None:
@@ -143,7 +140,7 @@ class RelayEnv(gym.Env):
             reward += dir_reward / total
             self.blocks_in_dir += 1
 
-            # Award for clustering non-solid blocks together (+ < 0.4 total)
+            # Award for clustering non-solid blocks together (+ < 0.2 total)
             # There must be an adjacent block. Don't count that one.
             num_clusters = 0
 
@@ -155,13 +152,13 @@ class RelayEnv(gym.Env):
                         num_clusters += 1
 
             cluster_reward = 1 if num_clusters > 1 else -1
-            reward += (cluster_reward / self.size) * 0.4
+            reward += (cluster_reward / self.size) * 0.2
 
-            # Reward for more center blocks (+ < 0.3 total)
+            # Reward for more center blocks (+ < 0.2 total)
             # Mahattan distance
             dist_to_center = abs(
                 self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
-            reward += (dist_to_center / (self.max_dist_to_center * self.size)) * 0.3
+            reward += (dist_to_center / (self.max_dist_to_center * self.size)) * 0.2
 
         info = {
             # The actual direction the agent took
@@ -185,7 +182,7 @@ class RelayEnv(gym.Env):
             self.difficulty = self.target_difficulty
 
         # Number of turns we want.
-        self.target_turns = 50 * (- 1 / (self.difficulty + 1) + 1) + 1
+        self.target_turns = 40 * (- 1 / (self.difficulty + 1) + 1) + 1
 
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
