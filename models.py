@@ -24,7 +24,7 @@ def dense(units):
         return x
     return f
 
-def relay_dense(input_space, num_actions, units=200):
+def relay_dense(input_space, num_actions, units=150):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
@@ -44,21 +44,20 @@ def relay_dense(input_space, num_actions, units=200):
 
     # Build image processing
     image = block_input
+    image = conv(5, border_mode='valid')(image)
     image = conv(10, border_mode='valid')(image)
     image = conv(20, border_mode='valid')(image)
     image = conv(30, border_mode='valid')(image)
-    image = conv(40, border_mode='valid')(image)
 
     image = Flatten()(image)
 
     # Build context feature processing
     context = merge([pos_input, dir_input, difficulty_input], mode='concat', name='context')
-    context = dense(50)(context)
+    context = dense(30)(context)
 
-    for i in range(2):
-        x = Dense(units, W_regularizer=l2(reg), activity_regularizer=activity_l2(reg))(image)
-        x = merge([x, context], mode='concat')
-        x = Activation('relu')(x)
+    x = Dense(units, W_regularizer=l2(reg), activity_regularizer=activity_l2(reg))(image)
+    x = merge([x, context], mode='concat')
+    x = Activation('relu')(x)
 
     # Multi-label
     policy = Dense(num_actions, name='policy', activation='softmax', W_regularizer=l2(reg), activity_regularizer=activity_l2(reg))(x)
