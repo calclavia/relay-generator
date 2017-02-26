@@ -30,7 +30,7 @@ class RelayEnv(gym.Env):
     def __init__(self, dim=(14, 9)):
         self.dim = dim
         self.size = dim[0] * dim[1]
-        self.max_blocks_per_turn = min(*dim)
+        self.max_blocks_per_turn = np.mean(dim)
         self.target_difficulty = None
         self.target_pos = None
 
@@ -140,7 +140,7 @@ class RelayEnv(gym.Env):
             reward += dir_reward / total
             self.blocks_in_dir += 1
 
-            # Award for clustering non-solid blocks together (+ < 0.2 total)
+            # Punish for clustering blocks together (- < 0.5 total)
             # There must be an adjacent block. Don't count that one.
             num_clusters = 0
 
@@ -152,13 +152,13 @@ class RelayEnv(gym.Env):
                         num_clusters += 1
 
             cluster_reward = 1 if num_clusters > 1 else -1
-            reward += (cluster_reward / self.size) * 0.2
+            reward += (cluster_reward / self.size) * -0.5
 
-            # Reward for more center blocks (+ < 0.2 total)
+            # Reward for more center blocks (+ < 0.1 total)
             # Mahattan distance
             dist_to_center = abs(
                 self.pos[0] - self.center_pos[0]) + abs(self.pos[1] - self.center_pos[1])
-            reward += (dist_to_center / (self.max_dist_to_center * self.size)) * 0.2
+            reward += (dist_to_center / (self.max_dist_to_center * self.size)) * 0.1
 
         info = {
             # The actual direction the agent took
@@ -182,7 +182,7 @@ class RelayEnv(gym.Env):
             self.difficulty = self.target_difficulty
 
         # Number of turns we want.
-        self.target_turns = 40 * (- 1 / (self.difficulty + 1) + 1) + 1
+        self.target_turns = 50 * (- 1 / (self.difficulty + 1) + 1) + 1
 
         self.world = World(self.dim)
         self.center_pos = (self.dim[0] // 2, self.dim[1] // 2)
