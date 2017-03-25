@@ -1,6 +1,3 @@
-tensorflow
+tensorflow-gpu
 keras
 gym
-flask
-gunicorn
-flask-cors
