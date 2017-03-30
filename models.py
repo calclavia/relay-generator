@@ -6,7 +6,7 @@ from keras.models import Model
 from keras.regularizers import l2
 from relay_generator import BlockType
 
-def relay_dense(input_space, num_actions, units=32, reg=1e-2, dropout=0.25):
+def relay_dense(input_space, num_actions, units=32, reg=1e-2, dropout=0.2):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
@@ -19,7 +19,7 @@ def relay_dense(input_space, num_actions, units=32, reg=1e-2, dropout=0.25):
 
     # Build image processing
     image = block_input
-    # image = Dropout(0.1)(image)
+    image = Dropout(0.1)(image)
 
     for l in range(3):
         prev = image
@@ -45,6 +45,10 @@ def relay_dense(input_space, num_actions, units=32, reg=1e-2, dropout=0.25):
     out = merge([image, context], mode='concat')
     # out = Concatenate()([image, context])
 
+    out = Dense(512, W_regularizer=l2(reg), b_regularizer=l2(reg))(out)
+    out = Activation('relu')(out)
+    out = Dropout(dropout)(out)
+
     policy = Dense(num_actions, name='policy', activation='softmax', W_regularizer=l2(reg), b_regularizer=l2(reg))(out)
     value = Dense(1, name='value', activation='linear', W_regularizer=l2(reg), b_regularizer=l2(reg))(out)
 
@@ -57,7 +61,6 @@ def relay_preprocess(env, observation):
     """
     Preprocesses the relay space
     """
-    # TODO: Could be optimized?
     map_space, pos_shape, dir_shape, difficulty_shape = env.observation_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
 
@@ -68,5 +71,5 @@ def relay_preprocess(env, observation):
 
     # One hot the dir_state
     dir_state_hot = np.zeros((dir_shape.n,))
-    dir_state_hot[dir_state[0] + 1] = 1
+    dir_state_hot[dir_state[0]] = 1
     return (map_state, pos_state, dir_state_hot, difficulty_state)

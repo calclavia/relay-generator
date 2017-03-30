@@ -1,3 +1,4 @@
+import numpy as np
 from enum import Enum
 
 num_directions = 4
@@ -14,6 +15,13 @@ DirectionMap = {
     2: Direction.up,
     3: Direction.down,
 }
+
+RotMap = np.array([
+    [2, 3],
+    [3, 2],
+    [1, 0],
+    [0, 1],
+])
 
 # Movement directions.
 num_move_dirs = 3

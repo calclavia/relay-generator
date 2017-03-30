@@ -1,3 +1,4 @@
 tensorflow-gpu
 keras==1.2.2
 gym
+h5py
