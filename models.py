@@ -1,11 +1,12 @@
 import numpy as np
-from keras.layers import Dense, Input, Concatenate, Add, Activation, Flatten, Dropout
+from keras.layers import Dense, Input, Activation, Flatten, Dropout, merge
 from keras.layers.recurrent import LSTM
-from keras.layers.convolutional import Conv2D
+from keras.layers.convolutional import Convolution2D
 from keras.models import Model
+from keras.regularizers import l2
 from relay_generator import BlockType
 
-def relay_dense(input_space, num_actions, units=150):
+def relay_dense(input_space, num_actions, units=32, reg=1e-2, dropout=0.25):
     # Build Network
     map_space, pos_shape, dir_shape, difficulty_shape = input_space.spaces
     num_block_types = int((map_space.high - map_space.low).max())
@@ -18,30 +19,34 @@ def relay_dense(input_space, num_actions, units=150):
 
     # Build image processing
     image = block_input
-    image = Dropout(0.2)(image)
+    # image = Dropout(0.1)(image)
 
     for l in range(3):
         prev = image
-        image = Conv2D(32, 3, padding='same')(image)
+        # image = Conv2D(32, 3, padding='same')(image)
+        image = Convolution2D(units, 3, 3, border_mode='same', W_regularizer=l2(reg), b_regularizer=l2(reg))(image)
         image = Activation('relu')(image)
-        image = Dropout(0.5)(image)
+        image = Dropout(dropout)(image)
 
         # Residual connection
         if l > 0:
-            image = Add()([image, prev])
+            # image = Add()([image, prev])
+            image = merge([image, prev], mode='sum')
 
     image = Flatten()(image)
 
     # Build context feature processing
-    context = Concatenate(name='context')([pos_input, dir_input, difficulty_input])
-    context = Dense(32)(context)
+    context = merge([pos_input, dir_input, difficulty_input], mode='concat')
+    # context = Concatenate(name='context')([pos_input, dir_input, difficulty_input])
+    context = Dense(units, W_regularizer=l2(reg), b_regularizer=l2(reg))(context)
     context = Activation('relu')(context)
-    context = Dropout(0.5)(context)
+    context = Dropout(dropout)(context)
 
-    out = Concatenate()([image, context])
+    out = merge([image, context], mode='concat')
+    # out = Concatenate()([image, context])
 
-    policy = Dense(num_actions, name='policy', activation='softmax')(out)
-    value = Dense(1, name='value', activation='linear')(out)
+    policy = Dense(num_actions, name='policy', activation='softmax', W_regularizer=l2(reg), b_regularizer=l2(reg))(out)
+    value = Dense(1, name='value', activation='linear', W_regularizer=l2(reg), b_regularizer=l2(reg))(out)
 
     model = Model([block_input, pos_input, dir_input,
                    difficulty_input], [policy, value])
