@@ -11,7 +11,7 @@ max_ep_reward = 3
 # Move left, forward, right or end
 num_actions = 4
 
-punishment = 0.01
+punishment = 0.05
 
 def interest_curve(x):
     """
@@ -151,7 +151,7 @@ class RelayEnv(gym.Env):
             reward += dir_reward / total
             self.blocks_in_dir += 1
 
-            # Punish for clustering blocks together (- < 1 total)
+            # Punish for clustering blocks together (- < 1.2 total)
             # There must be an adjacent block. Don't count that one.
             num_clusters = 0
 
@@ -162,8 +162,8 @@ class RelayEnv(gym.Env):
                     if self.world.blocks[neighbor_pos] != BlockType.solid.value:
                         num_clusters += 1
 
-            cluster_reward = 1 if num_clusters > 1 else -1
-            reward += (cluster_reward / self.size) * -1
+            cluster_percent = (num_clusters - 1) / 3
+            reward += (cluster_percent / self.size) * -1.5
 
         info = {
             # The actual direction the agent took
