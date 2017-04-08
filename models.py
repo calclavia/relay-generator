@@ -21,7 +21,7 @@ def relay_dense(input_space, num_actions, reg=1e-3, dropout=0.2):
     image = block_input
     # image = Dropout(0.1)(image)
 
-    for l, units in enumerate([10, 20, 30, 40]):
+    for l, units in enumerate([5, 10, 20]):
         prev = image
         # image = Conv2D(32, 3, padding='same')(image)
         image = Convolution2D(units, 3, 3, W_regularizer=l2(reg), b_regularizer=l2(reg))(image)
@@ -33,7 +33,7 @@ def relay_dense(input_space, num_actions, reg=1e-3, dropout=0.2):
     # Build context feature processing
     context = merge([pos_input, dir_input, difficulty_input], mode='concat')
     # context = Concatenate(name='context')([pos_input, dir_input, difficulty_input])
-    context = Dense(20, W_regularizer=l2(reg), b_regularizer=l2(reg))(context)
+    context = Dense(10, W_regularizer=l2(reg), b_regularizer=l2(reg))(context)
     context = Activation('relu')(context)
     # context = Dropout(dropout)(context)
 

@@ -33,7 +33,7 @@ class RelayEnv(gym.Env):
     def __init__(self, dim=(14, 9)):
         self.dim = dim
         self.size = dim[0] * dim[1]
-        self.max_blocks_per_turn = max(dim)
+        self.max_blocks_per_turn = min(dim)
         self.target_difficulty = None
         self.target_pos = None
 
@@ -163,7 +163,7 @@ class RelayEnv(gym.Env):
                         num_clusters += 1
 
             cluster_percent = (num_clusters - 1) / 3
-            reward += (cluster_percent / self.size) * -1.5
+            reward += (cluster_percent / self.size) * -1.2
 
         info = {
             # The actual direction the agent took
